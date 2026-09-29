@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>외과학 실습 과제 제출</title>
+<!-- Google Identity Services -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
+
+  /* 로그인 화면 */
+  .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .login-card { background: #fff; border-radius: 16px; padding: 40px 36px; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+  .login-logo { font-size: 40px; margin-bottom: 12px; }
+  .login-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .login-sub { font-size: 13px; color: #888; margin-bottom: 28px; line-height: 1.6; }
+  .google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; font-weight: 500; transition: background .15s; }
+  .google-btn:hover { background: #f5f5f5; }
+  .google-btn img { width: 20px; height: 20px; }
+
+  /* 앱 화면 */
+  .header { background: #1a1a1a; color: #fff; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .header-left h1 { font-size: 16px; font-weight: 600; }
+  .header-left p  { font-size: 11px; color: #aaa; margin-top: 2px; }
+  .user-info { display: flex; align-items: center; gap: 10px; }
+  .user-avatar { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #555; }
+  .user-name { font-size: 13px; color: #ddd; }
+  .logout-btn { font-size: 12px; color: #888; background: none; border: 1px solid #555; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .logout-btn:hover { border-color: #999; color: #bbb; }
+
+  .container { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
+  .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 22px; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .step-badge { width: 24px; height: 24px; border-radius: 50%; background: #1a1a1a; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
+  input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; color: #1a1a1a; background: #fff; transition: border .15s; font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #1a1a1a; }
+  textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+  .btn { width: 100%; padding: 14px; border-radius: 9px; border: none; cursor: pointer; font-size: 15px; font-weight: 600; transition: all .15s; }
+  .btn-primary { background: #1a1a1a; color: #fff; }
+  .btn-primary:hover { background: #333; }
+  .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ── 반응형 ── */
+@media (max-width: 600px) {
+  .login-card { width: 95vw; padding: 28px 16px; }
+  .container  { padding: 12px 10px; }
+  .card       { padding: 14px 12px; }
+  .prof-grid  { grid-template-columns: 1fr; }
+  .step-badge { width: 20px; height: 20px; font-size: 11px; }
+  .card-title { font-size: 14px; }
+  .btn        { padding: 13px; font-size: 14px; }
+  .header h1  { font-size: 15px; }
+  .success-id { font-size: 15px; }
+
+  .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .user-info { width: 100%; justify-content: space-between; }
+  .task-item { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .prof-card { padding: 14px 10px; }
+  #week-selector > div { grid-template-columns: 1fr 1fr !important; }
+  input, select, textarea { font-size: 16px; }  /* 휴대폰에서 화면이 확대되지 않도록 */
+}
+
+@media (max-width: 400px) {
+  #week-selector > div { grid-template-columns: 1fr !important; }
+  .card-title { font-size: 13px; }
+}
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .badge-blue  { background: #e3f0fb; color: #1860a8; }
+  .badge-green { background: #e4f5ec; color: #1a7a45; }
+  .badge-amber { background: #fef5e4; color: #9a6300; }
+  .info-box    { background: #e8f4fd; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1860a8; margin-bottom: 14px; line-height: 1.6; }
+  .success-box { background: #e4f5ec; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #1a7a45; margin-bottom: 14px; }
+  .error-box   { background: #fdf0ef; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #c0392b; margin-bottom: 14px; }
+  .task-item { border: 2px solid #eee; border-radius: 8px; padding: 12px 14px; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .task-item:hover { border-color: #ccc; background: #fafafa; }
+  .task-item.selected { border-color: #1a1a1a; background: #fafafa; }
+  .prof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .prof-card { border: 2px solid #eee; border-radius: 8px; padding: 12px; cursor: pointer; transition: all .15s; text-align: center; }
+  .prof-card:hover { border-color: #ccc; background: #fafafa; }
+  .prof-card.selected { border-color: #1a1a1a; background: #f0f0f0; }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+  .summary-row .label { color: #888; }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .success-screen { text-align: center; padding: 32px 16px; }
+  .success-icon { font-size: 56px; margin-bottom: 16px; }
+  .success-id { font-family: monospace; font-size: 20px; font-weight: 700; background: #f0f0f0; padding: 10px 20px; border-radius: 8px; display: inline-block; margin: 12px 0; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- ① 로그인 화면 -->
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⚕</div>
+    <div class="login-title">외과학 실습 과제 제출</div>
+    <div class="login-sub">서울대학교 외과학 실습 평가 시스템<br>2026년도 · 학생용</div>
+
+    <!-- 1단계: Google 로그인 -->
+    <div id="login-step-google">
+      <div id="g_id_onload"
+        data-client_id="392193455175-fcee9i83p8jkskrp8k7r1so2juve6mjl.apps.googleusercontent.com"
+        data-callback="handleGoogleLogin"
+        data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+        data-type="standard" data-size="large" data-theme="outline"
+        data-text="sign_in_with" data-shape="rectangular"
+        data-logo_alignment="left" data-width="280">
+      </div>
+      <div style="font-size:11px;color:#aaa;margin-top:16px;line-height:1.8;">
+        처음 사용하시면 로그인 후 학번을 한 번 입력하게 됩니다.<br>
+        <b>학기 내내 같은 Google 계정</b>을 사용해 주세요.
+      </div>
+    </div>
+
+    <!-- 2단계: 학번 입력 (최초 1회) -->
+    <div id="login-step-register" style="display:none;text-align:left;">
+      <div class="info-box" style="margin-bottom:12px;">
+        <b id="reg-email"></b> 계정을 본인 학번과 연결합니다.<br>
+        한 번만 하면 다음부터는 바로 로그인됩니다.
+      </div>
+      <label style="font-size:12px;color:#888;display:block;margin-bottom:6px;">학번</label>
+      <input type="text" id="reg-hakbun" inputmode="numeric" placeholder="학번 6자리"
+        style="width:100%;padding:11px 12px;border:1px solid #ddd;border-radius:8px;font-size:15px;margin-bottom:10px;box-sizing:border-box;" />
+      <button class="btn btn-primary" id="reg-btn" onclick="submitRegistration()">학번 확인하고 연결하기</button>
+      <button onclick="backToGoogle()" style="width:100%;margin-top:8px;border:none;background:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;padding:6px;">
+        다른 계정으로 로그인
+      </button>
+    </div>
+
+    <!-- 3단계: 확인 메일 안내 -->
+    <div id="login-step-pending" style="display:none;text-align:left;">
+      <div class="success-box" style="margin-bottom:12px;line-height:1.7;">
+        📧 <b id="pending-email"></b> 으로<br>확인 메일을 보냈습니다.
+      </div>
+      <div style="font-size:13px;color:#555;line-height:1.9;margin-bottom:12px;">
+        메일에 적힌 <b>인증번호 6자리</b>를 입력해 주세요.<br>
+        <span style="color:#888;font-size:12px;">메일이 안 보이면 스팸함도 확인해 주세요.</span>
+      </div>
+      <input type="text" id="verify-code" inputmode="numeric" maxlength="6" placeholder="000000"
+        style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:22px;text-align:center;letter-spacing:8px;font-weight:600;margin-bottom:10px;box-sizing:border-box;" />
+      <button class="btn btn-primary" id="verify-btn" onclick="submitCode()">인증번호로 확인하기</button>
+      <div style="font-size:12px;color:#888;margin-top:14px;line-height:1.8;">
+        메일의 <b>계정 연동 확인하기</b> 버튼을 누르셨다면<br>
+        <a href="javascript:void(0)" onclick="retryLogin()" style="color:#1860a8;">여기를 눌러 계속하기</a>
+      </div>
+      <button onclick="resendVerify()" id="resend-btn" style="width:100%;margin-top:6px;border:none;background:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;padding:6px;">
+        확인 메일 다시 받기
+      </button>
+    </div>
+
+    <div style="font-size:12px;color:#c0392b;min-height:18px;margin-top:12px;line-height:1.6;" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ② 앱 화면 -->
+<div id="app-screen" style="display:none;">
+  <div class="header">
+    <div class="header-left">
+      <h1>외과학 실습 과제 제출</h1>
+      <p>서울대학교 외과학 실습 평가 시스템 · 2026년도</p>
+    </div>
+    <div class="user-info">
+      <img id="user-avatar" class="user-avatar" src="" alt="" />
+      <span class="user-name" id="user-name-display"></span>
+      <button class="logout-btn" onclick="signOut()">로그아웃</button>
+    </div>
+  </div>
+
+  <div class="container" id="main-container">
+    <div id="auth-error" class="error-box" style="display:none;"></div>
+
+    <div class="card" id="step-1">
+      <div class="card-title"><div class="step-badge">1</div> 학생 정보 확인</div>
+      <div id="student-verified" class="success-box"></div>
+    </div>
+
+    <div class="card" id="step-2">
+      <div class="card-title"><div class="step-badge">2</div> 실습 주차 선택</div>
+      <div id="week-selector"></div>
+    </div>
+
+    <div class="card" id="step-3" style="display:none;">
+      <div class="card-title"><div class="step-badge">3</div> 제출 항목 선택</div>
+      <div class="info-box">제출할 평가 항목을 선택하세요.</div>
+      <div id="task-list"></div>
+    </div>
+
+    <div class="card" id="step-4" style="display:none;">
+      <div class="card-title"><div class="step-badge">4</div> 담당 교수 선택</div>
+      <div class="info-box" id="task-prof-info"></div>
+      <div class="prof-grid" id="prof-grid"></div>
+    </div>
+
+    <div class="card" id="step-5" style="display:none;">
+      <div class="card-title"><div class="step-badge">5</div> 파일 첨부</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;" id="file-step-hint"></div>
+      <div id="upload-zone" style="border:1.5px dashed #ccc;border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:all .15s;"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#1a1a1a'"
+        ondragleave="this.style.borderColor='#ccc'"
+        ondrop="handleDrop(event)">
+        <div style="font-size:28px;margin-bottom:6px;">📎</div>
+        <div style="font-size:13px;font-weight:500;">PDF 파일을 클릭하거나 드래그하여 첨부</div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">PDF만 가능 · 최대 20MB</div>
+      </div>
+      <input type="file" id="file-input" accept="application/pdf,.pdf" style="display:none;" onchange="handleFileSelect(event)" />
+      <div id="file-info" style="display:none;margin-top:10px;">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f7f7;border-radius:8px;">
+          <span id="file-icon" style="font-size:20px;">📄</span>
+          <span id="file-name" style="font-size:13px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          <span id="file-size" style="font-size:11px;color:#888;white-space:nowrap;"></span>
+          <button onclick="removeFile()" style="border:none;background:none;cursor:pointer;color:#888;font-size:15px;padding:2px 6px;">✕</button>
+        </div>
+        <div style="height:3px;background:#eee;border-radius:99px;margin-top:8px;overflow:hidden;">
+          <div id="upload-progress" style="height:100%;background:#1a7a45;border-radius:99px;width:0%;transition:width .3s;"></div>
+        </div>
+        <div id="upload-status" style="font-size:11px;color:#888;margin-top:5px;"></div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:#888;line-height:1.7;">
+        ℹ️ 첨부한 파일은 담당 교수님만 열람할 수 있습니다. (선택사항)<br>
+        한글·워드·파워포인트는 <b>다른 이름으로 저장 → PDF</b>로 바꿔서 올려 주세요.
+      </div>
+    </div>
+
+    <div class="card" id="step-6" style="display:none;">
+      <div class="card-title"><div class="step-badge">6</div> 제출 확인</div>
+      <div id="submit-summary"></div>
+      <div class="form-group" style="margin-top:14px;">
+        <label>추가 메모 (선택)</label>
+        <textarea id="submit-memo" placeholder="교수님께 전달할 내용이 있으면 입력해 주세요."></textarea>
+      </div>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitForm()">제출하기</button>
+    </div>
+  </div>
+
+  <div class="container" id="success-container" style="display:none;">
+    <div class="card success-screen">
+      <div class="success-icon">✅</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:8px;">제출 완료!</div>
+      <div style="font-size:14px;color:#555;margin-bottom:16px;">과제가 정상적으로 제출되었습니다.</div>
+      <div class="success-id" id="success-id"></div>
+      <div style="font-size:13px;color:#888;margin-top:8px;">위 제출 ID를 기록해 두세요.</div>
+      <div style="margin-top:20px;padding:14px;background:#f7f7f7;border-radius:8px;font-size:13px;text-align:left;line-height:1.8;" id="success-detail"></div>
+      <button class="btn btn-primary" style="margin-top:20px;" onclick="resetForm()">다른 항목 제출하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// 외과학 실습 과제 제출 — 학생용
+// 이 파일에는 학생·교수 명단이나 이메일 주소가 들어 있지 않습니다.
+// 로그인한 본인의 정보만 서버에서 받아옵니다.
+// =====================================================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwEcyvvSmdMDmnM_y7mWuwev-o-sgoOX-dcwuJm3XOMQSWNtifuSibc5LoBZWXeLXe6xg/exec';
+const SECURITY_TOKEN = '504418864123d6ed1e286bb7a7a27e8d';
+
+let idToken   = null;   // Google 로그인 증명
+let session   = null;   // 서버 세션
+let me        = null;   // { name, id }
+let info      = null;   // 서버가 내려준 일정·항목·교수 정보
+let googleUser = null;
+let state     = { week:null, dk:null, task:null, taskIdx:null, profs:[] };
+let selectedFile = null;
+
+// 서버 호출 — 구글 계정이 여러 개 로그인된 브라우저에서도 동작하도록 credentials 생략
+async function api(payload) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    credentials: 'omit',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ token: SECURITY_TOKEN, session, ...payload })
+  });
+  const data = await res.json();
+  if (!data.success) {
+    const e = new Error(data.error || '서버 오류');
+    e.authError = !!data.authError;
+    throw e;
+  }
+  return data.data;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function badgeOf(campus) {
+  return campus === '본원' ? 'badge-blue' : campus === '분당' ? 'badge-green' : 'badge-amber';
+}
+function setErr(msg) { document.getElementById('login-err').textContent = msg || ''; }
+
+function showLoginStep(step) {
+  ['google', 'register', 'pending'].forEach(s => {
+    document.getElementById('login-step-' + s).style.display = (s === step) ? 'block' : 'none';
+  });
+}
+
+// =====================================================================
+// 로그인 · 등록
+// =====================================================================
+async function handleGoogleLogin(response) {
+  idToken = response.credential;
+  try {
+    googleUser = JSON.parse(atob(idToken.split('.')[1]));
+  } catch(e) { googleUser = null; }
+  setErr('확인 중...');
+  await routeLogin();
+}
+
+async function routeLogin() {
+  try {
+    const r = await api({ action: 'studentLogin', idToken });
+    setErr('');
+    if (r.status === 'new') {
+      document.getElementById('reg-email').textContent = r.email;
+      showLoginStep('register');
+      setTimeout(() => document.getElementById('reg-hakbun').focus(), 100);
+    } else if (r.status === 'pending') {
+      document.getElementById('pending-email').textContent = r.email;
+      showLoginStep('pending');
+    } else {
+      enterApp(r);
+    }
+  } catch(e) {
+    setErr(e.message);
+    showLoginStep('google');
+  }
+}
+
+async function submitRegistration() {
+  const hakbun = document.getElementById('reg-hakbun').value.trim();
+  if (!hakbun) { setErr('학번을 입력해 주세요.'); return; }
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true; btn.textContent = '확인 중...';
+  setErr('');
+  try {
+    const r = await api({ action: 'studentRegister', idToken, studentId: hakbun });
+    document.getElementById('pending-email').textContent = r.email;
+    showLoginStep('pending');
+  } catch(e) {
+    setErr(e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '학번 확인하고 연결하기';
+  }
+}
+
+async function submitCode() {
+  const code = (document.getElementById('verify-code').value || '').replace(/\D/g, '');
+  if (code.length !== 6) { setErr('인증번호 6자리를 입력해 주세요.'); return; }
+  const btn = document.getElementById('verify-btn');
+  btn.disabled = true; btn.textContent = '확인 중...';
+  setErr('');
+  try {
+    const r = await api({ action: 'studentVerifyCode', idToken, code });
+    enterApp(r);
+  } catch(e) {
+    setErr(e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '인증번호로 확인하기';
+  }
+}
+
+async function retryLogin() {
+  setErr('확인 중...');
+  try {
+    const r = await api({ action: 'studentLogin', idToken });
+    if (r.status === 'ok') { setErr(''); enterApp(r); return; }
+    setErr('아직 확인되지 않았습니다. 메일의 인증번호 6자리를 입력해 주세요.');
+  } catch(e) {
+    setErr(e.message);
+  }
+}
+
+async function resendVerify() {
+  const btn = document.getElementById('resend-btn');
+  btn.disabled = true;
+  setErr('');
+  try {
+    await api({ action: 'studentResend', idToken });
+    setErr('');
+    alert('확인 메일을 다시 보냈습니다.');
+  } catch(e) { setErr(e.message); }
+  finally { btn.disabled = false; }
+}
+
+function backToGoogle() {
+  idToken = null; setErr('');
+  showLoginStep('google');
+  try { google.accounts.id.disableAutoSelect(); } catch(e) {}
+}
+
+function enterApp(r) {
+  session = r.session;
+  me      = r.student;
+  info    = r;
+  sessionStorage.setItem('stu_session', JSON.stringify({ session, student: me, info: r }));
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-name-display').textContent = me.name;
+  const av = document.getElementById('user-avatar');
+  if (googleUser && googleUser.picture) { av.src = googleUser.picture; av.style.display = ''; }
+  else av.style.display = 'none';
+  initStudentView();
+}
+
+function signOut() {
+  if (session) api({ action: 'logout' }).catch(() => {});
+  session = null; idToken = null; me = null; info = null;
+  sessionStorage.removeItem('stu_session');
+  try { google.accounts.id.disableAutoSelect(); } catch(e) {}
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  showLoginStep('google');
+  setErr('');
+}
+
+// 새로고침해도 같은 탭에서는 로그인 유지
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('login-step-register').style.display === 'block') submitRegistration();
+  else if (document.getElementById('login-step-pending').style.display === 'block') submitCode();
+});
+
+window.onload = function() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem('stu_session') || 'null');
+    if (s && s.session) {
+      session = s.session; me = s.student; info = s.info;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+      document.getElementById('user-name-display').textContent = me.name;
+      document.getElementById('user-avatar').style.display = 'none';
+      initStudentView();
+    }
+  } catch(e) { sessionStorage.removeItem('stu_session'); }
+};
+
+function handleSessionError(e) {
+  if (!e.authError) return false;
+  alert('로그인이 만료되었습니다. 다시 로그인해 주세요.');
+  sessionStorage.removeItem('stu_session');
+  location.reload();
+  return true;
+}
+
+// =====================================================================
+// 제출 화면
+// =====================================================================
+function initStudentView() {
+  document.getElementById('student-verified').innerHTML =
+    `✅ <b>${esc(me.name)}</b> (${esc(me.id)}) 님으로 로그인되었습니다.`;
+
+  const el = document.getElementById('week-selector');
+  if (!info.schedule.length) {
+    el.innerHTML = '<div class="error-box">배정된 실습 일정이 없습니다. 실습 담당자에게 문의해 주세요.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;">' +
+    info.schedule.map(s => {
+      const campus = s.dk.split('-')[0];
+      return `<button class="task-item" style="display:block;text-align:left;background:${s.closed ? '#f7f7f7' : '#fff'};${s.closed ? 'cursor:not-allowed;opacity:.65;' : ''}"
+        id="week-${esc(s.week)}" ${s.closed ? 'disabled' : ''} onclick="selectWeek('${esc(s.week)}','${esc(s.dk)}')">
+        <div style="font-weight:600;font-size:14px;margin-bottom:3px;">${esc(s.week)}주차${s.closed ? ' <span style="color:#c0392b;font-size:11px;">마감</span>' : ''}</div>
+        <div><span class="badge ${badgeOf(campus)}">${esc(s.dk)}</span></div>
+        ${s.deadline ? `<div style="font-size:11px;color:${s.closed ? '#c0392b' : '#888'};margin-top:4px;">마감 ${esc(s.deadline)}</div>` : ''}
+      </button>`;
+    }).join('') + '</div>' +
+    (info.schedule.some(s => s.closed)
+      ? '<div style="font-size:12px;color:#888;margin-top:10px;line-height:1.7;">마감된 주차는 제출할 수 없습니다. 사정이 있으면 실습 담당 교수님께 문의해 주세요.</div>' : '');
+}
+
+function selectWeek(week, dk) {
+  const slot = info.schedule.find(s => s.week === week && s.dk === dk);
+  if (slot && slot.closed) {
+    alert(week + '주차는 제출이 마감되었습니다.\n(마감: ' + slot.deadline + ')\n\n실습 담당 교수님께 문의해 주세요.');
+    return;
+  }
+  state.week = week; state.dk = dk;
+  state.task = null; state.taskIdx = null; state.profs = [];
+  document.querySelectorAll('[id^="week-"]').forEach(b => b.classList.remove('selected'));
+  document.getElementById('week-' + week).classList.add('selected');
+
+  document.getElementById('task-list').innerHTML = info.tasks.map((t, i) => `
+    <div class="task-item" id="task-${i}" onclick="selectTask(${i})">
+      <div>
+        <div style="font-weight:500;font-size:14px;">${esc(t.name)}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">${t.pts}점${t.multi ? ' · 교수 여러 분 선택 가능' : ''}${t.fileRequired ? ' · <span style="color:#c0392b;font-weight:600;">PDF 첨부 필수</span>' : ''}</div>
+      </div>
+      <div style="color:#ccc;">›</div>
+    </div>`).join('');
+
+  document.getElementById('step-3').style.display = 'block';
+  ['step-4','step-5','step-6'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('step-3').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function selectTask(idx) {
+  const t = info.tasks[idx];
+  state.taskIdx = idx; state.task = t.name; state.profs = [];
+  document.querySelectorAll('.task-item[id^="task-"]').forEach(el => el.classList.remove('selected'));
+  document.getElementById('task-' + idx).classList.add('selected');
+
+  const profs = ((info.profsByWeek[state.week] || {})[t.name]) || [];
+  document.getElementById('task-prof-info').innerHTML = t.multi
+    ? `이 항목은 참석하신 교수님을 <b>최대 ${info.maxProfs}분까지</b> 선택할 수 있습니다. 선택한 교수님 각각에게 채점 요청이 전달됩니다.`
+    : '채점해 주실 교수님을 선택하세요.';
+
+  document.getElementById('prof-grid').innerHTML = profs.length
+    ? profs.map((p, i) => `
+      <div class="prof-card" id="prof-${i}" onclick="toggleProf(${i})">
+        <div style="font-size:22px;margin-bottom:4px;">${t.multi ? '<span id="check-' + i + '">☐</span>' : '👤'}</div>
+        <div style="font-weight:600;font-size:14px;">${esc(p.name)}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">${esc(p.role || '')}</div>
+      </div>`).join('')
+    : '<div class="error-box">이 분과에 배정된 교수님 정보가 없습니다. 실습 담당자에게 문의해 주세요.</div>';
+
+  document.getElementById('step-4').style.display = 'block';
+  ['step-5','step-6'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('step-4').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function toggleProf(i) {
+  const t = info.tasks[state.taskIdx];
+  const profs = ((info.profsByWeek[state.week] || {})[t.name]) || [];
+  const name = profs[i].name;
+
+  if (!t.multi) {
+    state.profs = [name];
+  } else {
+    const at = state.profs.indexOf(name);
+    if (at >= 0) state.profs.splice(at, 1);
+    else {
+      if (state.profs.length >= info.maxProfs) { alert('교수님은 최대 ' + info.maxProfs + '분까지 선택할 수 있습니다.'); return; }
+      state.profs.push(name);
+    }
+  }
+
+  profs.forEach((p, k) => {
+    const card = document.getElementById('prof-' + k);
+    const on = state.profs.includes(p.name);
+    card.classList.toggle('selected', on);
+    const chk = document.getElementById('check-' + k);
+    if (chk) chk.textContent = on ? '☑' : '☐';
+  });
+
+  if (!state.profs.length) {
+    ['step-5','step-6'].forEach(id => document.getElementById(id).style.display = 'none');
+    return;
+  }
+  const hint = document.getElementById('file-step-hint');
+  if (t.fileRequired) {
+    hint.innerHTML = '<b style="color:#c0392b;">이 항목은 PDF 첨부가 필수입니다.</b> 파일을 올려야 제출됩니다.';
+  } else {
+    hint.textContent = '첨부할 파일이 있으면 올려 주세요. (선택)';
+  }
+  document.getElementById('step-5').style.display = 'block';
+  document.getElementById('step-6').style.display = 'block';
+  updateSubmitSummary();
+  const btn = document.getElementById('submit-btn');
+  if (btn) btn.textContent = '제출하기';
+  document.getElementById('step-5').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+// =====================================================================
+// 파일
+// =====================================================================
+function getFileIcon() { return '📕'; }
+function formatSz(b) { if(b<1024) return b+'B'; if(b<1048576) return (b/1024).toFixed(1)+'KB'; return (b/1048576).toFixed(1)+'MB'; }
+
+function handleFileSelect(e) { processFile(e.target.files[0]); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').style.borderColor = '#ccc';
+  processFile(e.dataTransfer.files[0]);
+}
+
+function processFile(file) {
+  if (!file) return;
+  const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+  if (!isPdf) {
+    alert('PDF 파일만 첨부할 수 있습니다.\n\n한글·워드·파워포인트는 "다른 이름으로 저장"에서 PDF를 고르거나,\n인쇄 → PDF로 저장을 이용해 주세요.');
+    document.getElementById('file-input').value = '';
+    return;
+  }
+  const maxMB = info.maxFileMB || 20;
+  if (file.size > maxMB * 1024 * 1024) { alert('파일 크기는 ' + maxMB + 'MB 이하만 첨부할 수 있습니다.'); return; }
+  selectedFile = file;
+  document.getElementById('file-icon').textContent = getFileIcon();
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent = formatSz(file.size);
+  document.getElementById('file-info').style.display = 'block';
+  document.getElementById('upload-zone').style.borderColor = '#1a7a45';
+  document.getElementById('upload-progress').style.width = '100%';
+  const st = document.getElementById('upload-status');
+  st.textContent = '파일 준비 완료 (제출 시 업로드됩니다)';
+  st.style.color = '#1a7a45';
+  updateSubmitSummary();
+}
+
+function removeFile() {
+  selectedFile = null;
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('upload-zone').style.borderColor = '#ccc';
+  document.getElementById('upload-progress').style.width = '0%';
+  document.getElementById('upload-status').textContent = '';
+  updateSubmitSummary();
+}
+
+function readAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result.split(',')[1]);
+    r.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+    r.readAsDataURL(file);
+  });
+}
+
+function updateSubmitSummary() {
+  const campus = state.dk.split('-')[0];
+  const row = (label, value) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:13px;flex-wrap:wrap;">
+      <span style="color:#888;white-space:nowrap;">${label}</span>
+      <span style="text-align:right;min-width:0;word-break:break-word;">${value}</span></div>`;
+  document.getElementById('submit-summary').innerHTML =
+    row('학생', `<b>${esc(me.name)}</b> (${esc(me.id)})`) +
+    row('주차 · 분과', `<span class="badge ${badgeOf(campus)}">${esc(state.dk)}</span> ${esc(state.week)}주차`) +
+    row('평가 항목', `<b>${esc(state.task)}</b>`) +
+    row('담당 교수', state.profs.map(p => esc(p) + ' 교수님').join('<br>')) +
+    row('첨부 파일', selectedFile ? '📕 ' + esc(selectedFile.name)
+        : (info.tasks[state.taskIdx] || {}).fileRequired
+          ? '<span style="color:#c0392b;font-weight:600;">필요합니다 — PDF를 첨부해 주세요</span>'
+          : '<span style="color:#aaa;">없음 (선택)</span>') +
+    `<div style="font-size:12px;color:#9a6300;margin-top:10px;line-height:1.7;">
+       ℹ️ 같은 항목을 다시 제출하면 앞서 낸 내용이 <b>대체</b>됩니다.
+       수정 제출은 <b>1회만</b> 가능하니 확인 후 제출해 주세요.</div>`;
+}
+
+// =====================================================================
+// 제출
+// =====================================================================
+async function submitForm() {
+  const task = info.tasks[state.taskIdx] || {};
+  if (task.fileRequired && !selectedFile) {
+    alert(state.task + '은(는) PDF 파일 첨부가 필수입니다.\n\n5단계에서 파일을 올린 뒤 제출해 주세요.');
+    document.getElementById('step-5').scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>제출 중...';
+
+  try {
+    const payload = {
+      action:   'submit',
+      week:     state.week,
+      dk:       state.dk,
+      taskName: state.task,
+      professors: state.profs,
+      memo:     document.getElementById('submit-memo').value
+    };
+    if (selectedFile) {
+      btn.innerHTML = '<span class="spinner"></span>파일 준비 중...';
+      payload.fileName = selectedFile.name;
+      payload.fileData = await readAsBase64(selectedFile);
+      btn.innerHTML = '<span class="spinner"></span>제출 중...';
+    }
+    const r = await api(payload);
+
+    const fileNote = (selectedFile && !r.fileSaved)
+      ? `<div style="color:#c0392b;margin-top:10px;font-size:12px;line-height:1.7;">
+          ⚠️ 제출은 접수되었으나 첨부파일 저장에 실패했습니다.<br>같은 항목으로 파일을 첨부해 다시 제출해 주세요.${r.fileError ? ' (' + esc(r.fileError) + ')' : ''}</div>`
+      : '';
+
+    const mailNote = (r.mailSent < r.mailTotal)
+      ? `<div style="color:#9a6300;margin-top:8px;font-size:12px;">
+          ℹ️ 제출은 정상 접수되었습니다. 교수님 알림 메일 일부가 지연될 수 있습니다.</div>`
+      : '';
+
+    document.getElementById('main-container').style.display = 'none';
+    document.getElementById('success-container').style.display = 'block';
+    document.getElementById('success-id').textContent = r.submissionId;
+    document.getElementById('success-detail').innerHTML =
+      `<div style="margin-bottom:5px;"><span style="color:#888;">항목:</span> ${esc(state.task)}</div>
+       <div style="margin-bottom:5px;"><span style="color:#888;">분과:</span> ${esc(state.dk)} · ${esc(state.week)}주차</div>
+       <div style="margin-bottom:5px;"><span style="color:#888;">담당 교수:</span> ${r.professors.map(p => esc(p) + ' 교수님').join(', ')}</div>
+       ${r.resubmitted
+         ? `<div style="color:#9a6300;margin-top:10px;font-size:12px;line-height:1.7;">
+              ↻ ${r.round}차 제출입니다. 앞서 낸 내용은 이번 제출로 <b>대체</b>되었고,<br>교수님께는 이 최종본만 보입니다.</div>`
+         : '<div style="color:#1a7a45;margin-top:10px;font-size:12px;">✅ 교수님께 채점 요청이 전달되었습니다.</div>'}
+       ${fileNote}${mailNote}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '제출하기';
+    if (handleSessionError(e)) return;
+    alert('❌ 제출이 저장되지 않았습니다.\n' + e.message + '\n\n잠시 후 다시 시도해 주세요.');
+  }
+}
+
+function resetForm() {
+  document.getElementById('main-container').style.display = 'block';
+  document.getElementById('success-container').style.display = 'none';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').innerHTML = '제출하기';
+  document.getElementById('submit-memo').value = '';
+  state = { week:null, dk:null, task:null, taskIdx:null, profs:[] };
+  ['step-3','step-4','step-5','step-6'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.querySelectorAll('[id^="week-"]').forEach(b => b.classList.remove('selected'));
+  removeFile();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+</script>
+</body>
+</html>
