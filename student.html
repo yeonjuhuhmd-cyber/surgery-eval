@@ -12,7 +12,11 @@
   /* 로그인 화면 */
   .login-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
   .login-card { background: #fff; border-radius: 16px; padding: 40px 36px; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
-  .login-logo { font-size: 40px; margin-bottom: 12px; }
+  /* 로고 — 저장소에 logo.png 를 올려 두면 그 그림이 뜨고,
+     없으면 아무 일도 없었던 것처럼 ⚕ 기호가 그대로 보인다 */
+  .login-logo { font-size: 40px; margin-bottom: 12px; line-height: 1; }
+  .login-logo img { max-width: 190px; max-height: 70px; width: auto; height: auto; display: block; margin: 0 auto; }
+  .login-logo.has-logo .logo-fallback { display: none; }
   .login-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
   .login-sub { font-size: 13px; color: #888; margin-bottom: 28px; line-height: 1.6; }
   .google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px; border: 1px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; font-weight: 500; transition: background .15s; }
@@ -97,9 +101,13 @@
 <!-- ① 로그인 화면 -->
 <div id="login-screen" class="login-screen">
   <div class="login-card">
-    <div class="login-logo">⚕</div>
+    <div class="login-logo">
+      <img src="logo.png" alt="서울대학교 의과대학 외과학교실"
+           onload="this.parentNode.classList.add('has-logo')" onerror="this.remove()" />
+      <span class="logo-fallback">⚕</span>
+    </div>
     <div class="login-title">외과학 실습 과제 제출</div>
-    <div class="login-sub">서울대학교 외과학 실습 평가 시스템<br>2026년도 · 학생용</div>
+    <div class="login-sub">외과학교실 · 2026년도 학생용</div>
 
     <!-- 1단계: Google 로그인 -->
     <div id="login-step-google">
@@ -299,6 +307,19 @@
       </div>
       <button class="btn btn-primary" id="submit-btn" onclick="submitForm()">제출하기</button>
     </div>
+
+    <div class="card" id="card-mysubs">
+      <div class="card-title" style="justify-content:space-between;">
+        <span>📋 내 제출 현황</span>
+        <button onclick="loadMySubs()" id="mysubs-btn"
+                style="padding:5px 12px;border:1px solid #ddd;background:#fff;border-radius:7px;cursor:pointer;font-size:12px;color:#666;font-weight:400;">새로고침</button>
+      </div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;line-height:1.7;">
+        지금까지 낸 것이 모두 여기에 보입니다. 제출이 제대로 들어갔는지 확인하실 수 있습니다.
+        <b>점수는 여기에 표시되지 않습니다.</b>
+      </div>
+      <div id="mysubs-list" style="font-size:13px;color:#888;">불러오는 중...</div>
+    </div>
   </div>
 
   <div class="container" id="success-container" style="display:none;">
@@ -320,7 +341,7 @@
 // 이 파일에는 학생·교수 명단이나 이메일 주소가 들어 있지 않습니다.
 // 로그인한 본인의 정보만 서버에서 받아옵니다.
 // =====================================================================
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwEcyvvSmdMDmnM_y7mWuwev-o-sgoOX-dcwuJm3XOMQSWNtifuSibc5LoBZWXeLXe6xg/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyxJmg3ms94zZfgu5QcTwdPrkdX32ma4j6HuKsIH_SqIqedPVUXmKKzqjDz9l-cVH3vBA/exec';
 const SECURITY_TOKEN = '504418864123d6ed1e286bb7a7a27e8d';
 
 let idToken   = null;   // Google 로그인 증명
@@ -550,6 +571,7 @@ function initStudentView() {
   const fh = document.getElementById('file-hint');
   if (fh) fh.textContent = 'PDF만 가능 · 최대 ' + (info.maxFileMB || 10) + 'MB';
   loadMyPhoto();
+  loadMySubs();
 
   const el = document.getElementById('week-selector');
   if (!info.schedule.length) {
@@ -573,6 +595,44 @@ function initStudentView() {
       ? '<div style="font-size:12px;color:#a8442f;margin-top:10px;line-height:1.7;">마감이 지난 주차도 제출은 됩니다. 다만 <b>지각 제출</b>로 기록되며 성적에 반영될 수 있습니다.</div>' : '') +
     (info.schedule.some(s => s.excused)
       ? '<div style="font-size:12px;color:#1a7a45;margin-top:8px;line-height:1.7;">예외가 인정된 주차는 마감이 지나도 <b>지각으로 기록되지 않습니다.</b></div>' : '');
+}
+
+// 내 제출 현황 — 무엇이 언제 들어갔는지 학생이 직접 확인한다. 점수는 내려오지 않는다.
+async function loadMySubs() {
+  const el = document.getElementById('mysubs-list');
+  const btn = document.getElementById('mysubs-btn');
+  if (!el) return;
+  if (btn) { btn.disabled = true; btn.textContent = '불러오는 중'; }
+  try {
+    const list = await api({ action: 'mySubmissions' });
+    if (!list.length) {
+      el.innerHTML = '<div style="padding:14px 0;color:#aaa;">아직 제출한 것이 없습니다.</div>';
+      return;
+    }
+    el.innerHTML = list.map(s => `
+      <div style="padding:11px 0;border-top:1px solid #eee;">
+        <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+          <b style="font-size:13px;color:#1a1a1a;">${esc(s.taskName)}</b>
+          <span style="font-size:12px;color:#888;">${esc(s.week)}주차 · ${esc(s.dk)}</span>
+        </div>
+        <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;font-size:11px;">
+          <span style="background:#eefaf2;border:1px solid #bfe3cd;color:#1a7a45;border-radius:6px;padding:2px 8px;font-weight:600;">접수됨</span>
+          <span style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:2px 8px;">${esc(s.round)}차${s.round > 1 ? ' (최신)' : ''}</span>
+          ${s.fileName ? `<span style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:2px 8px;">📎 ${esc(s.fileName)}</span>` : ''}
+          ${s.late
+            ? '<span style="background:#fbeeea;border:1px solid #e4c0b6;color:#a8442f;border-radius:6px;padding:2px 8px;font-weight:600;">⏰ 지각 제출</span>'
+            : (s.deadline ? '<span style="background:#fff;border:1px solid #e0e0e0;color:#888;border-radius:6px;padding:2px 8px;">마감 안에 제출</span>' : '')}
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:5px;">
+          제출 ${esc(s.submittedAt)} · 제출ID <b style="font-family:monospace;color:#666;">${esc(s.submissionId)}</b>
+          · 담당 ${esc(s.professors)}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="error-box">불러오지 못했습니다: ${esc(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '새로고침'; }
+  }
 }
 
 // 본인 사진 — 올리기 전에 브라우저에서 작게 줄여 보낸다 (용량·전송시간)
@@ -1025,6 +1085,7 @@ function resetForm() {
   ['step-3','step-4','step-5','step-6'].forEach(id => document.getElementById(id).style.display = 'none');
   document.querySelectorAll('[id^="week-"]').forEach(b => b.classList.remove('selected'));
   removeFile();
+  loadMySubs();          // 방금 낸 것이 목록에 바로 보이도록
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
