@@ -11,7 +11,13 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
 /* ── 로그인 ── */
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #1a1a1a; }
 .login-box { background: #fff; border-radius: 14px; padding: 40px 36px; width: 340px; text-align: center; }
-.login-logo { font-size: 42px; margin-bottom: 14px; }
+/* 로고 — 저장소에 logo.png(밝은 배경용) / logo-white.png(어두운 상단바용) 를
+   올려 두면 그 그림이 뜨고, 없으면 ⚕ 기호가 그대로 보인다 */
+.login-logo { font-size: 42px; margin-bottom: 14px; line-height: 1; }
+.login-logo img { max-width: 190px; max-height: 70px; width: auto; height: auto; display: block; margin: 0 auto; }
+.login-logo.has-logo .logo-fallback { display: none; }
+.brand-mark { height: 22px; width: auto; vertical-align: -5px; margin-right: 7px; }
+.topbar h1.has-logo .brand-fallback { display: none; }
 .login-title { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
 .login-sub { font-size: 12px; color: #888; margin-bottom: 28px; line-height: 1.6; }
 .login-input { width: 100%; padding: 11px 13px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 10px; }
@@ -322,7 +328,11 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
 <!-- ① 로그인 화면 -->
 <div id="login-wrap" class="login-wrap">
   <div class="login-box">
-    <div class="login-logo">⚕</div>
+    <div class="login-logo">
+      <img src="logo.png" alt="서울대학교 의과대학 외과학교실"
+           onload="this.parentNode.classList.add('has-logo')" onerror="this.remove()" />
+      <span class="logo-fallback">⚕</span>
+    </div>
     <div class="login-title">외과학 실습 채점 시스템</div>
     <div class="login-sub">담당 교수님 전용</div>
 
@@ -353,7 +363,10 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
 <!-- ② 앱 -->
 <div id="app" class="app">
   <div class="topbar">
-    <h1><span class="t-full">⚕ 외과학 실습 채점 시스템</span><span class="t-short">⚕ 외과학 채점</span></h1>
+    <h1 id="topbar-title"><img src="logo-white.png" alt="" class="brand-mark"
+             onload="document.getElementById('topbar-title').classList.add('has-logo')"
+             onerror="this.remove()" /><span class="brand-fallback">⚕ </span><span
+        class="t-full">외과학 실습 채점 시스템</span><span class="t-short">외과학 채점</span></h1>
     <div class="topbar-right">
       <span id="topbar-user"></span>
       <button class="topbar-btn" onclick="showPanel('grading')">채점</button>
@@ -808,11 +821,14 @@ const RUBRICS = {
 // 명단·이메일·성적은 이 파일에 없습니다. 로그인 후 서버에서만 받아옵니다.
 // 채점 결과는 이 기기에 저장되지 않고 서버(Google Sheets)에만 기록됩니다.
 // =====================================================================
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwEcyvvSmdMDmnM_y7mWuwev-o-sgoOX-dcwuJm3XOMQSWNtifuSibc5LoBZWXeLXe6xg/exec';
+// 이 화면의 버전. 서버와 다르면 관리 화면 설정 탭이 알려 준다.
+const PAGE_VERSION = '2026-10-09';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyxJmg3ms94zZfgu5QcTwdPrkdX32ma4j6HuKsIH_SqIqedPVUXmKKzqjDz9l-cVH3vBA/exec';
 
 let session       = null;
 let currentProf   = null;   // { name, email, admin }
 let SUBS          = {};     // 제출ID → 제출 기록 (메모리에만)
+let SERVER_VERSION = '';    // 서버가 알려 준 코드 버전
 let currentTarget = null;   // { id, hadFile }
 let currentGrades = {};
 let savedSnapshot = '';
@@ -888,6 +904,7 @@ async function handleProfGoogleLogin(response) {
     session = r.session; currentProf = r.prof;
     sessionStorage.setItem('prof_session', JSON.stringify({ session, prof: currentProf }));
     clearOldLocalPhotos();   // 예전 버전이 이 기기에 남긴 사진을 치운다
+    SERVER_VERSION = r.version || '';
     TURNS = Array.isArray(r.turns) ? r.turns : [];
     CUR_TURN = r.currentTurn || null;
     // 서버가 제출 목록까지 함께 보내 주므로 한 번 더 부르지 않는다
@@ -1688,10 +1705,22 @@ function switchTab(tab, el) {
 function renderSettings() {
   const el = document.getElementById('prof-list-wrap');
   if (!el || !currentProf) return;
+  // 화면과 서버가 같은 버전인지 보여 준다.
+  // 둘이 다르면 둘 중 하나만 올린 것이다 — 업데이트할 때 가장 흔한 실수다.
+  const sv = SERVER_VERSION || '(모름)';
+  const same = SERVER_VERSION && SERVER_VERSION === PAGE_VERSION;
   el.innerHTML = `<div style="font-size:13px;line-height:1.9;">
     현재 로그인: <b>${esc(currentProf.name)}</b> (${esc(currentProf.email)})<br>
-    권한: ${currentProf.admin ? '관리자 — 전체 제출물 조회, 최종 점수 확정, 성적 CSV, 시스템 로그' : '담당 교수 — 본인 담당 제출물만 조회·채점'}
-  </div>`;
+    권한: ${currentProf.admin ? '관리자 — 전체 제출물 조회, 최종 점수 확정, 성적 CSV, 시스템 로그' : '담당 교수 — 본인 담당 제출물만 조회·채점'}<br>
+    버전: 화면 <b>${esc(PAGE_VERSION)}</b> · 서버 <b>${esc(sv)}</b>
+    ${same ? '<span style="color:#1a7a45;font-weight:600;">✅ 일치</span>'
+           : `<span style="color:#c0392b;font-weight:600;">⚠️ 다릅니다</span>`}
+  </div>` + (same ? '' : `<div class="warn-box" style="margin-top:8px;line-height:1.7;">
+    화면과 서버의 버전이 다릅니다. 둘 중 하나만 올라간 상태입니다.<br>
+    · 서버가 옛날이면 — Apps Script에서 <b>새 버전으로 배포</b>하세요.<br>
+    · 화면이 옛날이면 — GitHub의 html 두 파일을 교체하고 <b>Ctrl+Shift+R</b>로 새로 고치세요.<br>
+    · 화면이 보는 서버 주소: <span style="font-family:monospace;font-size:11px;word-break:break-all;">${esc(GAS_URL)}</span>
+  </div>`);
   renderIdleSelect();
 }
 
