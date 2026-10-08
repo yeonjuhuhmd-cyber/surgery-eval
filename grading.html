@@ -368,6 +368,7 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
       <div class="sidebar-header">
         <div class="sidebar-title">학생 목록</div>
         <div class="sidebar-filter">
+          <select id="filter-turn" onchange="changeTurn(this.value)" style="display:none;"></select>
           <select id="filter-week" onchange="renderSidebar()">
             <option value="">전체 주차</option>
             <option value="2">2주차</option><option value="3">3주차</option>
@@ -456,7 +457,7 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 12px;background:#f7f7f7;border-radius:8px;">
           <span style="font-size:12px;color:#888;">가명코드 · 제출ID로 학생 찾기</span>
-          <input id="code-lookup" placeholder="S-7B010A 또는 6D7AEB54"
+          <input id="code-lookup" placeholder="S-7B010A2C4D 또는 6D7AEB54"
             style="padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:monospace;width:190px;" />
           <button onclick="lookupCode()" style="padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">조회</button>
           <span id="code-result" style="font-size:13px;font-weight:600;"></span>
@@ -575,16 +576,95 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
           <div class="info-box" style="line-height:1.7;">
             주차별 마감일시를 넘기면 학생이 제출할 수 없습니다.
             <b>비워 두면 그 주차는 제한이 없습니다.</b><br>
-            보통 실습 주간이 끝나는 <b>토요일 00시</b>로 잡습니다. 아래 버튼으로 한 번에 채운 뒤 필요한 주차만 고치세요.<br>
-            <b>실습 첫 주는 강의만 하므로 제출이 없습니다.</b> 첫 마감은 2주차, 즉 입력하신 날짜의 <b>다음 주 토요일</b>부터 채워집니다.
+            보통 실습 주간이 끝나는 <b>금요일 23:59</b>로 잡습니다. 아래 버튼으로 한 번에 채운 뒤 필요한 주차만 고치세요.<br>
+            <b>실습 첫 주는 강의만 하므로 제출이 없습니다.</b> 첫 마감은 2주차, 즉 입력하신 날짜의 <b>다음 주 금요일</b>부터 채워집니다.
           </div>
           <div class="deadline-fill">
             <label for="deadline-base">첫 주차 실습 시작일(월요일)</label>
             <input type="date" id="deadline-base" oninput="previewFirstDeadline()" onchange="previewFirstDeadline()" />
-            <button onclick="fillSaturdays()">토요일 00시로 채우기</button>
+            <button onclick="fillFridays()">금요일 23:59로 채우기</button>
           </div>
           <div id="deadline-preview" style="font-size:12px;color:#1860a8;margin:-4px 0 12px;line-height:1.6;"></div>
           <div id="deadline-wrap" style="font-size:13px;color:#666;">설정 탭을 열면 불러옵니다.</div>
+        </div>
+
+        <div class="excel-section admin-only">
+          <h3>학생 배정표</h3>
+          <div class="info-box" style="line-height:1.7;">
+            학사에서 받으신 <b>배정표 엑셀 파일을 그대로</b> 올리시면 됩니다. 정리하실 필요 없습니다.<br>
+            시트 이름에서 턴을, 머리글에서 주차를, 칸에서 분과와 캠퍼스를 읽습니다.
+            빈 칸은 외과 실습이 없는 주로 처리하고, <b>핸드폰·학교 이메일 열은 읽지 않습니다.</b><br>
+            올리면 <b>반영 전에 먼저 보여드리고</b> 확인을 받습니다.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button onclick="document.getElementById('roster-upload').click()"
+                    style="padding:8px 16px;background:#1860a8;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;">📂 배정표 엑셀 올리기</button>
+            <input type="file" id="roster-upload" accept=".xlsx,.xls" style="display:none;" onchange="handleRosterUpload(event)" />
+            <button onclick="loadRosterInfo()"
+                    style="padding:8px 14px;border:1px solid #ddd;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">🔄 현황 새로고침</button>
+          </div>
+          <div id="roster-info" style="font-size:13px;color:#666;">설정 탭을 열면 불러옵니다.</div>
+          <div id="roster-preview"></div>
+        </div>
+
+        <div class="excel-section admin-only">
+          <h3>배정 변경</h3>
+          <div class="info-box" style="line-height:1.7;">
+            턴이나 분과가 바뀐 학생 <b>한 명의 한 주차</b>를 여기서 고칩니다. 배정표를 다시 올리실 필요 없습니다.<br>
+            <b>분과를 비우고 저장하면</b> 그 주차 배정이 없어집니다(응급·정형 등 외과 실습이 아닌 주).<br>
+            바꾸면 그 학생 화면의 주차 목록이 바로 바뀌고, <b>이미 제출한 건은 그대로 남습니다.</b>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+            <input id="plan-sid" placeholder="학번 (예: 2021-12345)" onkeydown="if(event.key==='Enter')loadStudentPlan()"
+                   style="padding:9px 12px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:200px;" />
+            <button onclick="loadStudentPlan()"
+                    style="padding:9px 16px;background:#1860a8;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;">배정 불러오기</button>
+          </div>
+          <div id="plan-edit" style="font-size:13px;color:#666;">학번을 넣고 불러오세요.</div>
+        </div>
+
+        <div class="excel-section admin-only">
+          <h3>학생이 보낸 배정 변경 요청</h3>
+          <div class="info-box">
+            학생은 <b>요청만</b> 할 수 있고, 실제 배정은 위 "배정 변경"에서 관리자가 바꿉니다.<br>
+            배정을 고치신 뒤 <b>처리완료</b>를, 반영하지 않을 요청은 이유를 적고 <b>반영 안 함</b>을 눌러 주세요.
+          </div>
+          <div style="margin-bottom:10px;">
+            <button onclick="loadPlanRequests()"
+                    style="padding:8px 14px;border:1px solid #ddd;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">🔄 요청 목록 새로고침</button>
+          </div>
+          <div id="plan-req" style="font-size:13px;color:#666;">설정 탭을 열면 불러옵니다.</div>
+        </div>
+
+        <div class="excel-section admin-only">
+          <h3>마감 예외</h3>
+          <div class="info-box" style="line-height:1.7;">
+            진단서나 학사 사유가 인정된 학생은 <b>그 주차만</b> 지각 표시에서 빼 줄 수 있습니다.
+            예외를 걸어 두면 그 뒤에 들어오는 제출이 지각으로 표시되지 않습니다.<br>
+            걸거나 푸는 것은 채점 화면의 제출물에서 <b>관리자 예외 승인 → 마감 예외</b>로 합니다. 여기서는 목록만 봅니다.
+          </div>
+          <div style="margin-bottom:10px;">
+            <button onclick="loadLateExceptions()"
+                    style="padding:8px 14px;border:1px solid #ddd;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">🔄 예외 목록 새로고침</button>
+          </div>
+          <div id="late-exc" style="font-size:13px;color:#666;">설정 탭을 열면 불러옵니다.</div>
+        </div>
+
+        <div class="excel-section admin-only">
+          <h3>채점 독려 메일</h3>
+          <div class="info-box" style="line-height:1.7;">
+            <b>화요일·금요일 오전</b>에, 채점이 남은 교수님께만 자동으로 나갑니다.
+            메일에는 학생 이름·주차·분과·항목 목록과 <b>채점 화면 링크</b>가 들어갑니다.
+            채점을 다 하신 교수님께는 보내지 않습니다.<br>
+            지금 바로 보내고 싶으시면 아래 버튼을 쓰세요. 보내기 전에 누구에게 몇 건인지 먼저 보여드립니다.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button onclick="loadPending()"
+                    style="padding:8px 14px;border:1px solid #ddd;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">🔄 미채점 현황 보기</button>
+            <button onclick="sendReminders()" id="remind-btn"
+                    style="padding:8px 16px;background:#1860a8;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;">✉️ 지금 독려 메일 보내기</button>
+          </div>
+          <div id="pending-list" style="font-size:13px;color:#666;">설정 탭을 열면 불러옵니다.</div>
         </div>
 
         <div class="excel-section admin-only">
@@ -608,14 +688,51 @@ body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background
           <h3>학생 계정 등록 현황</h3>
           <div class="info-box">
             학생이 Google 계정과 학번을 연결한 기록입니다.
+            본인 확인은 <b>학사 명단에 등록된 메일 주소</b>로 보낸 인증번호로 이루어집니다.<br>
+            그 메일함을 쓸 수 없는 학생은 <b>승인대기</b>로 올라옵니다. 본인임을 확인하신 뒤 <b>승인</b>을 눌러 주세요.
             기기를 바꾸었거나 다른 계정으로 다시 등록해야 하는 학생은 <b>등록 해제</b>를 눌러 주세요.
           </div>
           <div id="account-list" style="font-size:13px;color:#666;">설정 탭을 열면 불러옵니다.</div>
         </div>
-        <div class="excel-section">
-          <h3>이 기기의 학생 사진</h3>
-          <div class="warn-box">학생 사진은 이 기기 브라우저에만 저장됩니다. 공용 PC라면 사용 후 삭제해 주세요.</div>
-          <button onclick="clearLocalPhotos()" style="padding:9px 18px;background:#c0392b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;">이 기기의 학생 사진 삭제</button>
+        <div class="excel-section admin-only">
+          <h3>학생 사진 관리</h3>
+          <div class="info-box" style="line-height:1.7;">
+            사진은 <b>Drive 비공개 폴더</b>(외과학실습_학생사진)에 가명코드 이름으로만 저장됩니다. 파일 이름에 실명·학번이 없고, 아무에게도 공유되지 않습니다.<br>
+            내려보내는 것은 <b>그 학생을 담당하는 교수와 실습 담당자</b>뿐입니다. 받은 사진은 화면이 열려 있는 동안만 보이고 기기에 저장되지 않습니다.<br>
+            학생이 직접 올릴 수도 있고(제출 화면 1단계), 교수님이 📷 학생 사진 탭에서 대신 올려도 됩니다.<br>
+            <b>학기가 끝나고 교수회의 보고까지 마치면</b> 아래에서 한꺼번에 지워 주세요.
+          </div>
+          <div id="photo-status" style="font-size:13px;color:#666;margin-bottom:12px;">설정 탭을 열면 불러옵니다.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input id="photo-del-reason" placeholder="삭제 사유 (예: 2026학년도 종료, 교수회의 보고 완료)"
+                   style="padding:9px 12px;border:1px solid #ddd;border-radius:7px;font-size:13px;flex:1;min-width:240px;" />
+            <input id="photo-del-confirm" placeholder="사진삭제 라고 입력"
+                   style="padding:9px 12px;border:1px solid #e0a0a0;border-radius:7px;font-size:13px;width:150px;" />
+            <button onclick="runDeleteAllPhotos()" id="photo-del-btn"
+                    style="padding:9px 18px;background:#c0392b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;">사진 일괄 삭제</button>
+          </div>
+          <div id="photo-del-result" style="font-size:13px;margin-top:10px;"></div>
+        </div>
+
+        <div class="excel-section admin-only" style="border:1px solid #f0c8c0;background:#fffafa;">
+          <h3 style="color:#c0392b;">시스템 초기화</h3>
+          <div class="warn-box" style="line-height:1.7;">
+            <b>제출물·채점·이력·계정 연결을 모두 비웁니다.</b> 다음 턴을 깨끗하게 시작하거나
+            시험 삼아 넣어 본 자료를 치울 때 쓰세요.<br>
+            <b>남는 것</b> — 학생 명단, 실습 배정, 교수 명단, 마감 일정은 그대로 있습니다. 다시 올리실 필요 없습니다.<br>
+            <b>없어지는 것</b> — 제출 기록, 점수, 채점이력, 제출시도 기록, 학생의 Google 계정 연결(학생들이 다시 로그인하면 됩니다).<br>
+            지우기 전에 <b>백업을 한 벌 뜨고</b> 교수님과 심서희 선생님께 메일로 보냅니다. 백업이 실패하면 초기화하지 않습니다.
+            이전 시트와 제출 파일 폴더는 Drive에 <b>(이전 날짜)</b> 이름으로 남겨 둡니다.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <input id="reset-reason" placeholder="초기화 사유 (예: 4턴 시작 전 시험자료 정리)"
+                   style="padding:9px 12px;border:1px solid #ddd;border-radius:7px;font-size:13px;flex:1;min-width:240px;" />
+            <input id="reset-confirm" placeholder="초기화 라고 입력"
+                   style="padding:9px 12px;border:1px solid #e0a0a0;border-radius:7px;font-size:13px;width:150px;" />
+            <button id="reset-btn" onclick="runAdminReset()"
+                    style="padding:9px 18px;background:#c0392b;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;">초기화 실행</button>
+          </div>
+          <div id="reset-result" style="font-size:13px;margin-top:12px;"></div>
         </div>
       </div>
     </div>
@@ -703,6 +820,15 @@ let appStarted = false, loadedOnce = false, lastLoadError = '';
 
 function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+// onclick="fn('${...}')" 처럼 HTML 속성 안의 JS 문자열에 값을 넣을 때 쓴다.
+// esc() 만으로는 부족하다 — &#39; 는 HTML 파서가 ' 로 되돌린 뒤 JS 가 읽으므로
+// 따옴표를 빠져나갈 수 있다. 역슬래시를 먼저 붙인 뒤 HTML escape 를 한다.
+function escAttr(v) {
+  return esc(String(v ?? '').replace(/[\u0000-\u001f]/g, ' ')
+                            .replace(/\\/g, '\\\\')
+                            .replace(/'/g, "\\'"));
+}
+
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -761,6 +887,9 @@ async function handleProfGoogleLogin(response) {
     const r = await api({ action: 'profLogin', idToken: response.credential });
     session = r.session; currentProf = r.prof;
     sessionStorage.setItem('prof_session', JSON.stringify({ session, prof: currentProf }));
+    clearOldLocalPhotos();   // 예전 버전이 이 기기에 남긴 사진을 치운다
+    TURNS = Array.isArray(r.turns) ? r.turns : [];
+    CUR_TURN = r.currentTurn || null;
     // 서버가 제출 목록까지 함께 보내 주므로 한 번 더 부르지 않는다
     if (Array.isArray(r.submissions)) applySubmissions(r.submissions);
     enterApp();
@@ -925,13 +1054,55 @@ function openFromUrl() {
   return false;
 }
 
-function startAutoRefresh() { if (!window._t) window._t = setInterval(loadSubmissions, 30000); }
+// 한 턴이 끝나도 지우지 않고 쌓아 두되, 화면에는 고른 턴만 올린다.
+// 턴을 바꾸면 서버에서 그 턴만 다시 받아온다.
+let TURNS = [], CUR_TURN = null;
+
+function renderTurnSelect() {
+  const sel = document.getElementById('filter-turn');
+  if (!sel) return;
+  if (TURNS.length <= 1) { sel.style.display = 'none'; return; }
+  sel.style.display = '';
+  sel.innerHTML = TURNS.map(t => `<option value="${esc(t)}"${String(t) === String(CUR_TURN) ? ' selected' : ''}>${esc(t)}턴</option>`).join('')
+    + `<option value="전체"${CUR_TURN === '전체' ? ' selected' : ''}>전체 턴</option>`;
+}
+
+async function changeTurn(t) {
+  if (currentTarget && hasUnsavedChanges() &&
+      !confirm('저장하지 않은 채점 내용이 있습니다. 턴을 바꿀까요?')) { renderTurnSelect(); return; }
+  CUR_TURN = t;
+  currentTarget = null;
+  document.body.classList.remove('detail-mode');
+  SUBS = {}; loadedOnce = false;
+  showToast(t === '전체' ? '전체 턴을 불러옵니다...' : t + '턴을 불러옵니다...', '#1860a8');
+  await loadSubmissions();
+  showPanel(document.getElementById('manage-panel').style.display === 'none' ? 'grading' : 'manage');
+}
+
+// 자동 새로고침
+//
+// 교수 100명이 창을 켜 두면 30초마다 100건이 계속 돈다. 대부분은 보고 있지도 않은 창이다.
+// 그래서 ① 간격을 60초로 늘리고 ② 다른 탭을 보는 동안에는 멈춘다.
+// 돌아오면 그때 한 번 받아온다.
+const REFRESH_MS = 60000;
+
+function startAutoRefresh() {
+  if (!window._t) window._t = setInterval(() => {
+    if (document.hidden) return;        // 보고 있지 않으면 건너뛴다
+    loadSubmissions();
+  }, REFRESH_MS);
+}
 function stopAutoRefresh() { clearInterval(window._t); window._t = null; }
+
+// 창으로 돌아오면 한 번 받아온다 (멈춰 있던 동안의 변화를 바로 반영)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && session && loadedOnce) loadSubmissions();
+});
 
 async function loadSubmissions() {
   if (!session) return;
   try {
-    applySubmissions(await api({ action: 'getSubmissions' }));
+    applySubmissions(await api({ action: 'getSubmissions', turn: CUR_TURN }));
   } catch(e) {
     if (handleAuthError(e)) return;
     if (e.message !== lastLoadError) showToast('⚠️ 제출 목록을 불러오지 못했습니다: ' + e.message, '#c0392b');
@@ -949,6 +1120,7 @@ function applySubmissions(rows) {
   loadedOnce = true; lastLoadError = '';
 
   if (!document.getElementById('filter-dept')) return;   // 아직 화면이 열리기 전
+  renderTurnSelect();
   refreshDeptFilter();
   renderSidebar();
   if (currentTarget) {
@@ -1044,7 +1216,7 @@ function renderSidebar() {
     // 화면에 떠 있는 제출물과 목록이 어긋나지 않게 한다.
     if (d && !doneOpen && !active) return header;
 
-    const photo = lsGet('photo_' + s.studentId);
+    const photo = photoOf(s);
     const thumb = photo ? `<div class="student-thumb"><img src="${photo}" alt="" /></div>`
                         : `<div class="student-thumb">${esc((s.name || '?')[0])}</div>`;
     if (d && doneOpen && s.taskName !== lastTask) {
@@ -1054,6 +1226,7 @@ function renderSidebar() {
     const mine = myGrade(s);
     const stale = needsRegrade(s);
     const extra = [
+      s.late ? '⏰지각' : null,
       mine ? (isStale(mine, s) ? '이전 ' + mine.score + '점' : mine.score + '점') : null,
       stale ? '재채점 필요' : null,
       (s.professors.length > 1 ? '교수 ' + s.professors.length + '명' : null),
@@ -1064,7 +1237,7 @@ function renderSidebar() {
     ].filter(Boolean).join(' · ');
 
     return header + `<div class="student-item${active ? ' active' : ''}${d ? ' graded' : ''}"
-      onclick="selectSubmission('${esc(s.submissionId)}')">
+      onclick="selectSubmission('${escAttr(s.submissionId)}')">
       ${thumb}
       <div class="student-info-sm">
         <div class="student-name-sm">${esc(s.name || s.studentId)}</div>
@@ -1144,7 +1317,10 @@ function showPanel(panel) {
 function renderGradingContent() {
   const s = currentTarget && SUBS[currentTarget.id];
   if (!s) return;
-  const photo = lsGet('photo_' + s.studentId);
+  const photo = photoOf(s);
+  if (s.pseudo && PHOTOS[s.pseudo] === undefined) {
+    ensurePhoto(s.pseudo, () => { keepComment(); renderGradingContent(); });
+  }
   const ti = TASK_KEYS.indexOf(s.taskKey);
   const taskMax = ti >= 0 ? TASK_MAX[ti] : 0;
   const score = ti >= 0 ? calcScores()[s.taskKey] : null;
@@ -1158,7 +1334,7 @@ function renderGradingContent() {
 
   html += `<div class="student-card">
     <div class="student-photo-wrap">
-      <div class="student-photo" onclick="triggerPhotoUpload('${esc(s.studentId)}')" title="클릭하여 사진 업로드">
+      <div class="student-photo" onclick="triggerPhotoUpload('${escAttr(s.pseudo)}')" title="클릭하여 사진 업로드">
         ${photo ? `<img src="${photo}" alt="" />` : '<div style="font-size:11px;text-align:center;padding:8px;color:#aaa;">사진<br>없음<br>클릭 업로드</div>'}
       </div>
       <div class="photo-hint">클릭하여 사진 변경</div>
@@ -1174,7 +1350,15 @@ function renderGradingContent() {
         <div style="font-size:11px;color:#888;margin-bottom:2px;">제출 항목</div>
         <div style="font-size:14px;font-weight:700;">${esc(s.taskName)}</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">만점 ${taskMax}점 · 내 채점 <span id="card-current-score" style="color:${score !== null ? '#1a7a45' : '#aaa'};font-weight:600;">${disp}</span></div>
-        <div style="font-size:11px;color:#aaa;margin-top:4px;">제출: ${esc(s.submittedAt)} · 제출ID ${esc(s.submissionId)}</div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;">
+          <span style="background:#eefaf2;border:1px solid #bfe3cd;color:#1a7a45;border-radius:6px;padding:3px 9px;font-weight:600;">접수됨</span>
+          <span style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:3px 9px;">${esc(s.round || 1)}차${(s.round || 1) > 1 ? ' (최신본)' : ''}</span>
+          ${s.fileName ? `<span style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:3px 9px;">📎 ${esc(s.fileName)}</span>` : ''}
+          ${s.late
+            ? `<span style="background:#fbeeea;border:1px solid #e4c0b6;color:#a8442f;border-radius:6px;padding:3px 9px;font-weight:600;">⏰ 지각${s.deadline ? ' · 마감 ' + esc(s.deadline) : ''}</span>`
+            : (s.deadline ? `<span style="background:#fff;border:1px solid #e0e0e0;color:#888;border-radius:6px;padding:3px 9px;">마감 ${esc(s.deadline)} 안에</span>` : '')}
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:5px;">제출 ${esc(s.submittedAt)} · 제출ID ${esc(s.submissionId)}</div>
         ${s.round > 1 ? `<div style="font-size:12px;color:#9a6300;margin-top:4px;font-weight:600;">
           ↻ 학생이 ${esc(s.round)}차까지 다시 제출했습니다 · 위 내용이 최종본입니다
           <span style="font-weight:400;color:#aaa;">(최초 ${esc(s.firstAt)})</span></div>` : ''}
@@ -1189,10 +1373,18 @@ function renderGradingContent() {
         <a class="file-attach-badge" href="${esc(s.fileUrl)}" target="_blank" rel="noopener">
           📎 ${esc(s.fileName || '첨부파일')} <span style="color:#1860a8;">Drive에서 열기 ↗</span></a></div>` : ''}
       ${mine && !isStale(mine, s) ? `<div class="saved-badge" style="margin-top:8px;">✅ 내 채점 저장됨 (${esc(mine.gradedAt)})</div>` : ''}
-      ${currentProf.admin ? `<div style="margin-top:8px;">
-        <button onclick="allowResubmit()" style="padding:5px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#1860a8;">
-          ↻ 수정 제출 1회 더 허용</button>
-        <span style="font-size:11px;color:#aaa;margin-left:6px;">현재 ${esc(s.round || 1)}차 / 최대 2차</span></div>` : ''}
+      ${currentProf.admin ? `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e0e0e0;">
+        <div style="font-size:11px;color:#888;margin-bottom:5px;">관리자 예외 승인</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="allowResubmit(false)" style="padding:5px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#1860a8;">
+            ↻ 1회 더 허용</button>
+          <button onclick="allowResubmit(true)" style="padding:5px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#1860a8;">
+            ⟲ 제출 횟수 초기화</button>
+          <button onclick="toggleLateException()" style="padding:5px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#a8442f;">
+            ⏰ 마감 예외 ${s.late ? '주기' : '설정/해제'}</button>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:5px;">현재 ${esc(s.round || 1)}차 / 최대 2차 · 어느 쪽이든 사유를 적어야 하고 채점이력에 남습니다</div>
+      </div>` : ''}
     </div>
   </div>`;
 
@@ -1310,11 +1502,27 @@ async function saveGrade() {
     return;
   }
 
+  // 이미 저장된 내 점수가 있고 점수가 달라지면 사유를 받는다.
+  // 학생이 다시 제출해서 재채점하는 경우는 묻지 않는다.
+  const mine = (s.grades || []).find(g => g.profName === currentProf.name);
+  let reason = '';
+  if (mine && !isStale(mine, s) && Number(mine.score) !== Number(score)) {
+    reason = (prompt('이미 ' + mine.score + '점으로 저장되어 있습니다.\n' +
+                     score + '점으로 바꾸는 사유를 적어 주세요. (채점이력에 남습니다)') || '').trim();
+    if (reason.length < 2) { alert('사유를 적어야 점수를 바꿀 수 있습니다.'); return; }
+  }
+
   const btn = document.querySelector('.save-btn');
   if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
   try {
-    const r = await api({ action: 'grade', submissionId: s.submissionId, score,
+    const r = await api({ action: 'grade', submissionId: s.submissionId, score, reason,
                           detail: currentGrades[key], comment: currentGrades.comment || '' });
+    if (r.changed === false) {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ 채점 저장'; }
+      savedSnapshot = JSON.stringify(currentGrades);
+      showToast('바뀐 내용이 없어 그대로 두었습니다', '#666');
+      return;
+    }
     const others = (s.grades || []).filter(g => g.profName !== currentProf.name);
     s.grades = others.concat([{ profName: currentProf.name, score,
                                 detail: JSON.parse(JSON.stringify(currentGrades[key])),
@@ -1343,18 +1551,32 @@ function toggleFinalPanel() {
   if (!open) p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-async function saveFinalScore() { await sendFinalScore(document.getElementById('final-score-input').value); }
+async function saveFinalScore() {
+  const v = document.getElementById('final-score-input').value;
+  const r = askReason('최종 점수를 ' + v + '점으로 직접 정하는 사유를 적어 주세요.\n(채점이력에 남습니다)');
+  if (r === null) return;
+  await sendFinalScore(v, r);
+}
 async function clearFinalScore() {
-  if (!confirm('최종 점수 확정을 해제할까요?')) return;
-  await sendFinalScore('');
+  const r = askReason('최종 점수 확정을 해제하고 교수 평균으로 돌리는 사유를 적어 주세요.\n(채점이력에 남습니다)');
+  if (r === null) return;
+  await sendFinalScore('', r);
 }
 
-async function sendFinalScore(value) {
+// 사유를 받아 온다. 비우거나 취소하면 null — 호출한 쪽에서 그냥 멈춘다.
+function askReason(msg) {
+  const r = (prompt(msg) || '').trim();
+  if (r.length < 2) { if (r !== '') alert('사유를 조금 더 적어 주세요.'); return null; }
+  return r;
+}
+
+async function sendFinalScore(value, reason) {
   const s = currentTarget && SUBS[currentTarget.id];
   if (!s) return;
   try {
-    const r = await api({ action: 'setFinalScore', submissionId: s.submissionId, score: value });
+    const r = await api({ action: 'setFinalScore', submissionId: s.submissionId, score: value, reason });
     s.finalScore = r.finalScore; s.finalBy = r.finalBy; s.finalAt = r.finalAt;
+    if (r.changed === false) { showToast(r.message || '바뀐 내용이 없습니다', '#666'); return; }
     showToast(r.finalScore === null ? '확정이 해제되었습니다' : '✅ 최종 점수 ' + r.finalScore + '점으로 확정', '#1a7a45');
     keepComment(); renderGradingContent(); renderSidebar();
   } catch(e) {
@@ -1430,7 +1652,7 @@ function renderGradeLog() {
     const detail = gs.length ? gs.map(g => esc(g.profName) + ' ' + esc(g.score)).join('<br>') : '<span style="color:#aaa;">미채점</span>';
     const fin = (s.finalScore !== null && s.finalScore !== undefined && s.finalScore !== '')
       ? `<b style="color:#1a7a45;">${esc(s.finalScore)}</b>` : '<span style="color:#aaa;">-</span>';
-    return `<tr onclick="selectSubmission('${esc(s.submissionId)}')" style="cursor:pointer;">
+    return `<tr onclick="selectSubmission('${escAttr(s.submissionId)}')" style="cursor:pointer;">
       <td style="font-family:monospace;font-size:11px;">${esc(s.submissionId)}</td>
       <td style="font-weight:500;">${esc(s.name || s.studentId)}</td>
       <td><span class="badge badge-gray">${esc(s.week)}주차</span></td>
@@ -1450,12 +1672,16 @@ function switchTab(tab, el) {
   const btn = el || (typeof event !== 'undefined' && event && event.target) ||
     [...document.querySelectorAll('.tab-btn')].find(b => (b.getAttribute('onclick') || '').includes("'" + tab + "'"));
   if (btn && btn.classList) btn.classList.add('active');
-  document.getElementById('tab-' + tab).classList.add('active');
+  const panel = document.getElementById('tab-' + tab);
+  if (!panel) return;             // 없는 탭 이름이 들어와도 화면이 죽지 않게
+  panel.classList.add('active');
   if (tab === 'grades')   renderGradeTable();
   if (tab === 'students') loadStudentStatus();
   if (tab === 'excel')    renderGradeLog();
   if (tab === 'photos')   renderPhotoGrid();
-  if (tab === 'settings') { renderSettings(); loadDeadlines(); loadProfs(); loadAccounts(); }
+  if (tab === 'settings') { renderSettings(); loadDeadlines(); loadProfs(); loadAccounts();
+                            loadRosterInfo(); loadPlanRequests(); loadLateExceptions();
+                            loadPending(); loadPhotoStatus(); }
   if (tab === 'logs')     { loadHistory(); loadLogs(); }
 }
 
@@ -1484,13 +1710,35 @@ async function loadAccounts() {
         <td data-label="학생">${esc(a.name)}</td>
         <td data-label="학번" style="font-family:monospace;font-size:11px;">${esc(a.studentId)}</td>
         <td data-label="Google 계정" style="font-size:11px;word-break:break-all;">${esc(a.email)}</td>
-        <td data-label="상태"><span class="badge ${a.state === '확인완료' ? 'badge-green' : 'badge-amber'}" style="font-size:11px;">${esc(a.state)}</span></td>
+        <td data-label="상태"><span class="badge ${a.state === '확인완료' ? 'badge-green' : a.state === '승인대기' ? 'badge-amber' : 'badge-gray'}" style="font-size:11px;">${esc(a.state)}</span></td>
         <td data-label="확인시각" style="font-size:11px;color:#888;">${esc(a.confirmedAt || a.requestedAt)}</td>
-        <td data-label=""><button onclick="resetAccount('${esc(a.pseudo)}','${esc(a.name)}')" style="padding:4px 12px;border:1px solid #e0b0ac;border-radius:5px;background:#fff;color:#c0392b;cursor:pointer;font-size:11px;">등록 해제</button></td>
+        <td data-label="" style="white-space:nowrap;">
+          ${a.state === '승인대기'
+            ? `<button onclick="approveAccount('${escAttr(a.pseudo)}','${escAttr(a.name)}')" style="padding:4px 12px;border:none;border-radius:5px;background:#1a7a45;color:#fff;cursor:pointer;font-size:11px;font-weight:600;margin-right:4px;">승인</button>`
+            : ''}
+          <button onclick="resetAccount('${escAttr(a.pseudo)}','${escAttr(a.name)}')" style="padding:4px 12px;border:1px solid #e0b0ac;border-radius:5px;background:#fff;color:#c0392b;cursor:pointer;font-size:11px;">등록 해제</button></td>
       </tr>`).join('') + '</tbody></table></div>';
   } catch(e) {
     if (handleAuthError(e)) return;
     el.textContent = '불러오지 못했습니다: ' + e.message;
+  }
+}
+
+async function approveAccount(pseudo, name) {
+  const reason = prompt(
+    (name ? name + ' 학생' : '이 학생') + '의 계정을 수동으로 승인합니다.\n\n' +
+    '등록된 메일로 확인이 안 되는 경우에만 쓰는 예외 처리입니다.\n' +
+    '본인임을 어떻게 확인하셨는지 적어 주세요. (기록에 남습니다)',
+    '');
+  if (reason === null) return;
+  if (String(reason).trim().length < 2) { alert('승인 사유를 적어 주세요.'); return; }
+  try {
+    await api({ action: 'approveAccount', pseudo, reason });
+    showToast('✅ 승인했습니다', '#1a7a45');
+    loadAccounts();
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    alert(e.message);
   }
 }
 
@@ -1518,9 +1766,10 @@ async function loadHistory() {
     if (!HISTORY.length) { el.textContent = '아직 채점 기록이 없습니다.'; return; }
     el.innerHTML = '<div style="overflow-x:auto;"><table class="grade-table"><thead><tr>' +
       '<th>시각</th><th>제출ID</th><th>가명코드</th><th>주차</th><th>분과</th><th>평가항목</th>' +
-      '<th>교수</th><th>구분</th><th>이전</th><th>점수</th></tr></thead><tbody>' +
+      '<th>교수</th><th>구분</th><th>이전</th><th>점수</th><th>수정 사유</th></tr></thead><tbody>' +
       HISTORY.map(h => {
-        const changed = h['구분'] === '수정' || String(h['구분']).indexOf('확정') >= 0;
+        const k = String(h['구분'] || '');
+        const changed = k.indexOf('수정') >= 0 || k.indexOf('확정') >= 0 || k.indexOf('복귀') >= 0;
         return `<tr${changed ? ' style="background:#fffaf2;"' : ''}>
           <td style="font-size:11px;white-space:nowrap;">${esc(h['시각'])}</td>
           <td style="font-family:monospace;font-size:11px;">${esc(h['제출ID'])}</td>
@@ -1530,7 +1779,8 @@ async function loadHistory() {
           <td>${esc(h['교수명'])}</td>
           <td style="font-size:11px;${changed ? 'color:#c0392b;font-weight:600;' : 'color:#888;'}">${esc(h['구분'])}</td>
           <td style="text-align:center;color:#888;">${h['이전점수'] === '' ? '-' : esc(h['이전점수'])}</td>
-          <td style="text-align:center;font-weight:700;">${esc(h['점수'])}</td></tr>`;
+          <td style="text-align:center;font-weight:700;">${esc(h['점수'])}</td>
+          <td style="font-size:11px;max-width:220px;">${esc(h['수정사유'] || '')}</td></tr>`;
       }).join('') + '</tbody></table></div>';
   } catch(e) {
     if (handleAuthError(e)) return;
@@ -1544,11 +1794,12 @@ function downloadHistoryCSV() {
   // 제출ID로 제출물과 이어 보도록 하고, 가명코드는 넣지 않는다
   const byId = {};
   Object.values(SUBS).forEach(s => { byId[s.submissionId] = s; });
-  downloadCSV([['시각','제출ID','학생명','학번','주차','분과','평가항목','교수명','구분','이전점수','점수','채점메모'],
+  downloadCSV([['시각','제출ID','학생명','학번','주차','분과','평가항목','교수명','구분','이전점수','점수','수정사유','수정자','채점메모'],
     ...HISTORY.map(h => {
       const s = byId[h['제출ID']] || {};
       return [h['시각'], h['제출ID'], s.name || '', s.studentId || '', h['주차'], h['분과'],
-              h['평가항목'], h['교수명'], h['구분'], h['이전점수'], h['점수'], h['채점메모']];
+              h['평가항목'], h['교수명'], h['구분'], h['이전점수'], h['점수'],
+              h['수정사유'] || '', h['수정자'] || '', h['채점메모']];
     })], '채점이력_' + new Date().toISOString().slice(0, 10) + '.csv');
 }
 
@@ -1606,8 +1857,16 @@ function showToast(msg, color) {
 // =====================================================================
 // 내보내기
 // =====================================================================
+// 엑셀은 = + - @ 로 시작하는 칸을 수식으로 읽는다.
+// 학생 메모나 파일명에 =HYPERLINK(...) 같은 걸 넣어 두면 교수님이 파일을 여는 순간 실행된다.
+function csvCell(v) {
+  let t = String(v ?? '').replace(/"/g, '""');
+  if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return '"' + t + '"';
+}
+
 function downloadCSV(rows, filename) {
-  const csv = '﻿' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   a.download = filename;
@@ -1663,7 +1922,8 @@ async function buildGradeMatrixCSV() {
   if (!confirm('학생 실명과 점수가 담긴 파일이 내려받아집니다.\n사용 후 삭제해 주세요.\n\n계속할까요?')) return;
   const m = await buildMatrixData();
   if (!m) return;
-  downloadCSV([m.head, ...m.rows], '성적취합표_' + new Date().toISOString().slice(0, 10) + '.csv');
+  const tag = CUR_TURN && CUR_TURN !== '전체' ? CUR_TURN + '턴_' : '전체_';
+  downloadCSV([m.head, ...m.rows], '성적취합표_' + tag + new Date().toISOString().slice(0, 10) + '.csv');
   showToast(`✅ 학생 ${m.rows.length}명 · ${m.maxRounds}회차 취합표를 내려받았습니다`, '#1a7a45');
 }
 
@@ -1671,7 +1931,7 @@ async function buildGradeMatrixCSV() {
 async function buildMatrixData() {
   try {
     if (!ROSTER) ROSTER = await api({ action: 'getRoster' });
-    await loadSubmissions();
+    await loadSubmissions();   // 지금 고른 턴만 들어온다
   } catch(e) {
     if (handleAuthError(e)) return null;
     alert('명단을 불러오지 못했습니다: ' + e.message);
@@ -1694,7 +1954,7 @@ async function buildMatrixData() {
   // ── 머리글 ──
   const head = ['학번', '이름'];
   for (let n = 1; n <= maxRounds; n++) {
-    head.push(`${n}회차_담당분과`, `${n}회차_주차`);
+    head.push(`${n}회차_담당분과`, `${n}회차_주차`, `${n}회차_지각`);
     MATRIX_SPEC.forEach(spec => {
       head.push(`${n}회차_${spec.label}_평균`);
       for (let g = 1; g <= spec.graders; g++) {
@@ -1707,8 +1967,10 @@ async function buildMatrixData() {
   head.push('총점', '만점', '미채점 항목수');
 
   // ── 본문 ──
+  // 고른 턴의 학생만 담는다. '전체 턴'이면 117명 전원.
+  const onlyTurn = CUR_TURN && CUR_TURN !== '전체' ? String(CUR_TURN) : null;
   const rows = ROSTER.students
-    .slice()
+    .filter(stu => !onlyTurn || String(stu.turn || '') === onlyTurn)
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
     .map(stu => {
       const line = [stu.id, stu.name];
@@ -1716,7 +1978,11 @@ async function buildMatrixData() {
 
       for (let n = 0; n < maxRounds; n++) {
         const slot = (roundsOf[stu.id] || [])[n];
-        line.push(slot ? slot.dk : '', slot ? slot.week + '주차' : '');
+        const slotSubs = slot ? Object.values(SUBS).filter(x =>
+          x.studentId === stu.id && x.week === slot.week) : [];
+        const lateCnt = slotSubs.filter(x => x.late).length;
+        line.push(slot ? slot.dk : '', slot ? slot.week + '주차' : '',
+                  slot ? (lateCnt ? lateCnt + '건' : '') : '');
         let roundSum = 0;
 
         MATRIX_SPEC.forEach(spec => {
@@ -1763,6 +2029,501 @@ async function buildMatrixData() {
     });
 
   return { head, rows, maxRounds };
+}
+
+// =====================================================================
+// 학생 배정표 올리기
+//
+// 학사 배정표를 손대지 않고 그대로 읽는다.
+//   · 시트 이름에서 턴      — "(4턴) 배치" → 4
+//   · 머리글에서 주차       — "2주 (10/26-10/30)" → 2
+//   · 칸에서 분과·캠퍼스    — "VS (분당)" → 분당-VS,  "BR" → 본원-BR
+//   · 빈 칸, 외과가 아닌 주(응급+정형 등)는 건너뛴다
+// =====================================================================
+let ROSTER_PENDING = null;
+
+// 엑셀 표기 → 시스템 분과. 대소문자와 표기 흔들림을 흡수한다.
+const DEPT_ALIAS = { 'B/E': 'Br/Endo', 'BR': 'Br', 'ENDO': 'Endo', 'B/E(보라매)': 'Br/Endo' };
+const NOT_SURGERY = ['응급', '정형', '휴가', '휴무'];
+
+function normalizeDept(raw, knownDepts) {
+  const txt = String(raw || '').trim();
+  if (!txt) return null;
+  if (NOT_SURGERY.some(w => txt.indexOf(w) >= 0)) return { skip: true, raw: txt };
+
+  // 괄호 안이 캠퍼스
+  const m = txt.match(/^(.*?)\s*\(\s*([^)]+?)\s*\)\s*$/);
+  const codeRaw = (m ? m[1] : txt).trim();
+  const campus  = (m ? m[2] : '본원').trim();
+
+  const up = codeRaw.toUpperCase();
+  const code = DEPT_ALIAS[up] || codeRaw;
+
+  // 시스템 분과와 대소문자 무시하고 맞춰 본다
+  const want = (campus + '-' + code).toLowerCase();
+  const hit = knownDepts.find(d => d.toLowerCase() === want);
+  if (hit) return { dk: hit, raw: txt };
+
+  const loose = knownDepts.find(d => {
+    const [c, k] = d.split('-');
+    return c === campus && k.toLowerCase() === code.toLowerCase();
+  });
+  return loose ? { dk: loose, raw: txt } : { unknown: true, raw: txt };
+}
+
+async function handleRosterUpload(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!currentProf || !currentProf.admin) { alert('관리자만 올릴 수 있습니다.'); return; }
+
+  const el = document.getElementById('roster-preview');
+  el.innerHTML = '<div style="padding:12px;color:#888;font-size:13px;">파일을 읽는 중...</div>';
+
+  let XLSX, wb, depts;
+  try {
+    XLSX = await loadXLSX();
+    wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+    if (!PROFMETA || !PROFMETA.depts.length) {
+      const g = await api({ action: 'getProfs' });
+      PROFMETA = { depts: g.depts, tasks: g.tasks };
+    }
+    depts = PROFMETA.depts;
+  } catch(err) {
+    if (handleAuthError(err)) return;
+    el.innerHTML = '';
+    alert('파일을 읽지 못했습니다: ' + err.message);
+    return;
+  }
+
+  const rows = [], unknown = {}, skipped = {}, warn = [];
+  let sheetsUsed = 0;
+
+  wb.SheetNames.forEach(name => {
+    const tm = String(name).match(/(\d+)\s*턴/);
+    const turn = tm ? tm[1] : '';
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, blankrows: true, defval: '' });
+
+    // 머리글 줄 = '학번'이 있는 첫 줄
+    let hr = -1;
+    for (let i = 0; i < Math.min(grid.length, 15); i++) {
+      if ((grid[i] || []).some(c => String(c).trim() === '학번')) { hr = i; break; }
+    }
+    if (hr < 0) { warn.push('[' + name + '] 머리글에 "학번" 칸이 없어 건너뜀'); return; }
+
+    const head = grid[hr] || [];
+    const idCol   = head.findIndex(c => String(c).trim() === '학번');
+    const nameCol = head.findIndex(c => String(c).trim() === '이름');
+    if (nameCol < 0) { warn.push('[' + name + '] "이름" 칸이 없어 건너뜀'); return; }
+
+    // 이메일은 오른쪽 작은 표에 따로 있다. 그 표의 학번 칸과 짝지어 읽는다.
+    const mailCol = head.findIndex(c => /이메일|메일|e-?mail/i.test(String(c).trim()));
+    let mailIdCol = -1;
+    if (mailCol > 0) {
+      head.forEach((c, i) => {
+        if (String(c).trim() === '학번' && i < mailCol && i > mailIdCol) mailIdCol = i;
+      });
+    }
+    const emailOf = {};
+    if (mailCol > 0 && mailIdCol >= 0) {
+      for (let r = hr + 1; r < grid.length; r++) {
+        const row = grid[r] || [];
+        const mid = String(row[mailIdCol] || '').trim();
+        const em  = String(row[mailCol]   || '').trim().toLowerCase();
+        if (mid && em) emailOf[mid] = em;
+      }
+    }
+
+    // 주차 칸 — "2주(3/3-3/6)" 처럼 적혀 있다
+    const weekCols = [];
+    head.forEach((c, i) => {
+      const wm = String(c).trim().match(/^(\d+)\s*주/);
+      if (wm) weekCols.push({ col: i, week: wm[1] });
+    });
+    if (!weekCols.length) { warn.push('[' + name + '] 주차 칸을 찾지 못해 건너뜀'); return; }
+    sheetsUsed++;
+
+    for (let r = hr + 1; r < grid.length; r++) {
+      const row = grid[r] || [];
+      const id   = String(row[idCol]   || '').trim();
+      const nm   = String(row[nameCol] || '').trim();
+      if (!id || !nm) continue;
+
+      const weeks = [];
+      weekCols.forEach(w => {
+        const res = normalizeDept(row[w.col], depts);
+        if (!res) return;
+        if (res.skip)    { skipped[res.raw] = (skipped[res.raw] || 0) + 1; return; }
+        if (res.unknown) { unknown[res.raw] = (unknown[res.raw] || 0) + 1; return; }
+        weeks.push({ week: w.week, dk: res.dk });
+      });
+      rows.push({ turn, id, name: nm, email: emailOf[id] || '', weeks });
+    }
+  });
+
+  ROSTER_PENDING = rows;
+  renderRosterPreview(rows, { sheetsUsed, unknown, skipped, warn, fileName: file.name });
+}
+
+function renderRosterPreview(rows, info) {
+  const el = document.getElementById('roster-preview');
+  if (!rows.length) {
+    el.innerHTML = `<div class="warn-box" style="margin-top:12px;">읽어낸 학생이 없습니다.<br>${
+      info.warn.map(esc).join('<br>') || '시트 형식을 확인해 주세요.'}</div>`;
+    return;
+  }
+
+  const byTurn = {};
+  rows.forEach(r => { const t = r.turn || '(턴 없음)'; byTurn[t] = (byTurn[t] || 0) + 1; });
+  const ids = rows.map(r => r.id);
+  const dup = [...new Set(ids.filter((v, i) => ids.indexOf(v) !== i))];
+  const plans = rows.reduce((a, r) => a + r.weeks.length, 0);
+  const depts = [...new Set(rows.flatMap(r => r.weeks.map(w => w.dk)))].sort();
+  const noWeek = rows.filter(r => !r.weeks.length);
+  const noMail = rows.filter(r => !r.email);
+  const mailDomains = {};
+  rows.forEach(r => { if (r.email) { const d = r.email.split('@')[1] || '?'; mailDomains[d] = (mailDomains[d] || 0) + 1; } });
+  const unknownKeys = Object.keys(info.unknown);
+
+  const chip = (label, value, color) =>
+    `<div style="flex:0 0 auto;padding:10px 14px;border:1px solid #e8e8e8;border-radius:10px;background:#fff;">
+       <div style="font-size:11px;color:#888;">${esc(label)}</div>
+       <div style="font-size:19px;font-weight:700;color:${color || '#1a1a1a'};">${esc(value)}</div></div>`;
+
+  el.innerHTML = `
+    <div style="margin-top:14px;border:1px solid #d7e3f5;background:#f7fbff;border-radius:12px;padding:16px;">
+      <div style="font-weight:600;margin-bottom:4px;">${esc(info.fileName)}</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px;">아래 내용으로 반영됩니다. 확인 후 저장해 주세요.</div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+        ${chip('학생', rows.length + '명')}
+        ${chip('배정', plans + '건')}
+        ${chip('분과', depts.length + '개')}
+        ${chip('시트', info.sheetsUsed + '개')}
+        ${chip('이상한 칸', unknownKeys.length + '종', unknownKeys.length ? '#c0392b' : '#1a7a45')}
+        ${chip('본인확인 메일', (rows.length - noMail.length) + '명', noMail.length ? '#9a6300' : '#1a7a45')}
+      </div>
+
+      <div style="font-size:13px;line-height:1.9;">
+        <b>턴별</b> ${Object.keys(byTurn).sort().map(t => esc(t) + '턴 ' + byTurn[t] + '명').join(' · ')}
+      </div>
+
+      <div style="font-size:13px;line-height:1.9;">
+        <b>본인확인 메일</b> ${Object.keys(mailDomains).sort((a,b)=>mailDomains[b]-mailDomains[a])
+          .map(d => esc(d) + ' ' + mailDomains[d] + '명').join(' · ') || '없음'}
+      </div>
+      ${noMail.length ? `<div class="warn-box" style="margin-top:10px;">
+        메일 주소가 없는 학생 ${noMail.length}명: ${noMail.slice(0,8).map(r => esc(r.name)).join(', ')}${noMail.length > 8 ? ' 외' : ''}<br>
+        이 학생들은 자동 확인이 되지 않아 <b>관리자 승인</b>으로 처리해야 합니다.</div>` : ''}
+      ${dup.length ? `<div class="warn-box" style="margin-top:10px;">같은 학번이 두 번 나옵니다: ${dup.slice(0,10).map(esc).join(', ')}</div>` : ''}
+      ${noWeek.length ? `<div class="warn-box" style="margin-top:10px;">배정된 주차가 하나도 없는 학생 ${noWeek.length}명: ${
+        noWeek.slice(0,6).map(r => esc(r.name)).join(', ')}${noWeek.length > 6 ? ' 외' : ''}</div>` : ''}
+      ${unknownKeys.length ? `<div class="warn-box" style="margin-top:10px;">
+        <b>분과로 알아보지 못한 칸이 있습니다. 이 칸들은 빠집니다.</b><br>
+        ${unknownKeys.slice(0,12).map(k => esc(k) + ' (' + info.unknown[k] + '건)').join(' · ')}</div>` : ''}
+      ${Object.keys(info.skipped).length ? `<div style="margin-top:10px;font-size:12px;color:#888;">
+        외과 실습이 아니어서 건너뛴 칸 — ${Object.keys(info.skipped).map(k => esc(k) + ' ' + info.skipped[k] + '건').join(' · ')}</div>` : ''}
+      ${info.warn.length ? `<div style="margin-top:10px;font-size:12px;color:#9a6300;">${info.warn.map(esc).join('<br>')}</div>` : ''}
+
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer;font-size:13px;color:#1860a8;">읽어낸 내용 몇 줄 보기</summary>
+        <div style="overflow-x:auto;margin-top:8px;">
+        <table class="grade-table"><thead><tr><th>턴</th><th>학번</th><th>이름</th><th>배정</th></tr></thead><tbody>${
+          rows.slice(0, 5).map(r => `<tr>
+            <td>${esc(r.turn)}</td><td style="font-family:monospace;font-size:11px;">${esc(r.id)}</td>
+            <td>${esc(r.name)}</td>
+            <td style="font-size:11px;color:#666;">${r.weeks.map(w => esc(w.week + '주 ' + w.dk)).join(' · ') || '<span style="color:#c0392b;">없음</span>'}</td>
+          </tr>`).join('')}</tbody></table></div>
+      </details>
+
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+        <button onclick="confirmRosterSave()" style="padding:9px 20px;background:#1a1a1a;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;">이대로 반영하기</button>
+        <button onclick="cancelRosterSave()" style="padding:9px 16px;border:1px solid #ddd;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">취소</button>
+      </div>
+    </div>`;
+}
+
+function cancelRosterSave() {
+  ROSTER_PENDING = null;
+  document.getElementById('roster-preview').innerHTML = '';
+}
+
+async function confirmRosterSave() {
+  if (!ROSTER_PENDING) return;
+  if (!confirm('지금 올라가 있는 학생 명단과 배정을 모두 바꿉니다.\n\n' +
+               '학생 ' + ROSTER_PENDING.length + '명으로 교체할까요?')) return;
+  try {
+    const r = await api({ action: 'saveRoster', rows: ROSTER_PENDING });
+    ROSTER_PENDING = null;
+    document.getElementById('roster-preview').innerHTML = '';
+    ROSTER = null;   // 성적 취합표가 새 명단을 쓰도록
+    showToast(`✅ 학생 ${r.students}명 · 배정 ${r.plans}건 반영했습니다`, '#1a7a45');
+    loadRosterInfo();
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    alert(e.message);
+  }
+}
+
+async function loadRosterInfo() {
+  const el = document.getElementById('roster-info');
+  if (!el || !currentProf || !currentProf.admin) return;
+  el.textContent = '불러오는 중...';
+  try {
+    const r = await api({ action: 'getRosterInfo' });
+    el.innerHTML = r.fromSheet
+      ? `<div style="display:flex;gap:14px;flex-wrap:wrap;">
+           <span>학생 <b>${esc(r.students)}</b>명</span>
+           <span>배정 <b>${esc(r.plans)}</b>건</span>
+           <span>${r.byTurn.map(t => esc(t.turn) + '턴 ' + esc(t.count) + '명').join(' · ')}</span>
+         </div>`
+      : `<div class="warn-box">아직 배정표를 올리지 않아, 예전에 코드에 적어 둔 명단 <b>${esc(r.students)}명</b>으로 동작하고 있습니다.</div>`;
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    el.textContent = '불러오지 못했습니다: ' + e.message;
+  }
+}
+
+// =====================================================================
+// 배정 변경 — 관리자가 한 학생의 한 주차를 고친다
+// =====================================================================
+let PLAN_EDIT = null;
+
+async function loadStudentPlan() {
+  const el = document.getElementById('plan-edit');
+  const sid = document.getElementById('plan-sid').value.trim();
+  if (!sid) { el.textContent = '학번을 넣어 주세요.'; return; }
+  el.textContent = '불러오는 중...';
+  try {
+    PLAN_EDIT = await api({ action: 'getStudentPlan', studentId: sid });
+    renderStudentPlan();
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    PLAN_EDIT = null;
+    el.innerHTML = `<div class="warn-box">${esc(e.message)}</div>`;
+  }
+}
+
+function renderStudentPlan() {
+  const el = document.getElementById('plan-edit');
+  const p = PLAN_EDIT;
+  if (!p) { el.textContent = '학번을 넣고 불러오세요.'; return; }
+  const weeks = [];
+  for (let w = 1; w <= 12; w++) {
+    const hit = p.weeks.find(x => String(x.week) === String(w));
+    weeks.push({ week: String(w), dk: hit ? hit.dk : '' });
+  }
+  el.innerHTML =
+    `<div style="margin-bottom:10px;"><b>${esc(p.name)}</b> (${esc(p.studentId)})
+       · ${p.turn ? esc(p.turn) + '턴' : '턴 미지정'}
+       · 가명코드 <span style="font-family:monospace;">${esc(p.pseudo)}</span></div>
+     <div style="overflow-x:auto;"><table class="grade-table"><thead><tr>
+       <th style="width:70px;">주차</th><th>분과</th><th style="width:110px;"></th></tr></thead><tbody>` +
+    weeks.map(w => `<tr>
+      <td style="text-align:center;">${esc(w.week)}주차</td>
+      <td><select id="plan-dk-${esc(w.week)}" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:100%;max-width:240px;">
+        <option value="">— 외과 실습 없음 —</option>
+        ${(p.depts || []).map(d => `<option value="${escAttr(d)}"${d === w.dk ? ' selected' : ''}>${esc(d)}</option>`).join('')}
+      </select></td>
+      <td><button onclick="saveStudentPlan('${escAttr(w.week)}')"
+            style="padding:6px 12px;border:1px solid #1860a8;color:#1860a8;background:#fff;border-radius:6px;cursor:pointer;font-size:12px;">저장</button></td>
+    </tr>`).join('') + '</tbody></table></div>';
+}
+
+async function saveStudentPlan(week) {
+  if (!PLAN_EDIT) return;
+  const sel = document.getElementById('plan-dk-' + week);
+  if (!sel) return;
+  const dk = sel.value;
+  const now = (PLAN_EDIT.weeks.find(x => String(x.week) === String(week)) || {}).dk || '(없음)';
+  if (dk === (now === '(없음)' ? '' : now)) { showToast('바뀐 내용이 없습니다', '#666'); return; }
+  const reason = askReason(PLAN_EDIT.name + ' ' + week + '주차: ' + now + ' → ' +
+                           (dk || '(없음)') + '\n\n변경 사유를 적어 주세요. (기록에 남습니다)');
+  if (reason === null) return;
+  try {
+    const r = await api({ action: 'changePlan', studentId: PLAN_EDIT.studentId,
+                          week: week, dk: dk, reason: reason });
+    showToast('✅ ' + r.message, '#1a7a45');
+    await loadStudentPlan();
+    loadRosterInfo();
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    alert('바꾸지 못했습니다.\n' + e.message);
+  }
+}
+
+// =====================================================================
+// 학생이 보낸 배정 변경 요청
+// =====================================================================
+async function loadPlanRequests() {
+  const el = document.getElementById('plan-req');
+  if (!el || !currentProf || !currentProf.admin) return;
+  el.textContent = '불러오는 중...';
+  try {
+    const list = await api({ action: 'getPlanRequests' });
+    const open = list.filter(r => r.state === '접수');
+    if (!list.length) { el.textContent = '아직 들어온 요청이 없습니다.'; return; }
+    el.innerHTML =
+      (open.length ? `<div class="info-box" style="background:#fff6e8;border-left:3px solid #e08b00;">
+          처리할 요청 <b>${open.length}건</b></div>` : '') +
+      '<div style="overflow-x:auto;"><table class="grade-table"><thead><tr>' +
+      '<th>접수</th><th>학생</th><th>주차</th><th>현재</th><th>요청 내용</th><th>상태</th><th></th>' +
+      '</tr></thead><tbody>' +
+      list.map(r => `<tr${r.state === '접수' ? ' style="background:#fffaf2;"' : ''}>
+        <td style="font-size:11px;white-space:nowrap;">${esc(String(r.at).slice(5, 16))}</td>
+        <td>${esc(r.name || r.pseudo)}${r.studentId ? `<div style="font-size:11px;color:#999;">${esc(r.studentId)}</div>` : ''}</td>
+        <td style="text-align:center;">${esc(r.week)}</td>
+        <td style="font-size:12px;">${esc(r.current)}</td>
+        <td style="font-size:12px;max-width:260px;">${esc(r.message)}</td>
+        <td style="font-size:12px;${r.state === '접수' ? 'color:#c0392b;font-weight:600;' : 'color:#888;'}">${esc(r.state)}
+          ${r.note ? `<div style="font-size:11px;color:#999;">${esc(r.note)}</div>` : ''}</td>
+        <td>${r.state === '접수' ? `
+          <button onclick="resolveReq(${r.row},'처리완료')"
+            style="padding:5px 10px;border:1px solid #1a7a45;color:#1a7a45;background:#fff;border-radius:6px;cursor:pointer;font-size:11px;">처리완료</button>
+          <button onclick="resolveReq(${r.row},'반영안함')"
+            style="padding:5px 10px;border:1px solid #c0392b;color:#c0392b;background:#fff;border-radius:6px;cursor:pointer;font-size:11px;margin-left:4px;">반영 안 함</button>`
+          : `<span style="font-size:11px;color:#aaa;">${esc(r.doneBy)}</span>`}</td>
+      </tr>`).join('') + '</tbody></table></div>';
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    el.textContent = '불러오지 못했습니다: ' + e.message;
+  }
+}
+
+async function resolveReq(row, state) {
+  let note = '';
+  if (state === '반영안함') {
+    note = askReason('반영하지 않는 이유를 적어 주세요. (학생에게 설명하실 때 쓰실 내용입니다)');
+    if (note === null) return;
+  } else {
+    if (!confirm('배정을 이미 고치셨나요?\n\n"배정 변경"에서 바꾸신 뒤 처리완료를 눌러 주세요.')) return;
+    note = (prompt('남길 메모가 있으면 적어 주세요. (없으면 그냥 확인)') || '').trim();
+  }
+  try {
+    await api({ action: 'resolvePlanRequest', row: row, state: state, note: note });
+    showToast('✅ ' + state + ' 로 기록했습니다', '#1a7a45');
+    loadPlanRequests();
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    alert(e.message);
+  }
+}
+
+// =====================================================================
+// 미채점 현황 · 채점 독려 메일
+// =====================================================================
+let PENDING = [];
+
+async function loadPending() {
+  const el = document.getElementById('pending-list');
+  if (!el || !currentProf || !currentProf.admin) return;
+  el.textContent = '불러오는 중...';
+  try {
+    PENDING = await api({ action: 'getPending' });
+    if (!PENDING.length) {
+      el.innerHTML = '<div class="info-box" style="background:#eefaf2;border-left:3px solid #1a7a45;">채점이 남은 교수님이 없습니다. 보낼 메일도 없습니다.</div>';
+      return;
+    }
+    const total = PENDING.reduce((a, r) => a + r.count, 0);
+    const nomail = PENDING.filter(r => !r.mailable);
+    el.innerHTML =
+      `<div style="margin-bottom:8px;">채점 대기 <b>${total}건</b> · 교수 <b>${PENDING.length}명</b></div>` +
+      (nomail.length ? `<div class="warn-box" style="margin-bottom:8px;">메일 주소가 없어 보낼 수 없는 교수: ${nomail.map(r => esc(r.prof)).join(', ')} — 교수 명단에서 주소를 넣어 주세요.</div>` : '') +
+      '<div style="overflow-x:auto;"><table class="grade-table"><thead><tr>' +
+      '<th>교수</th><th>대기</th><th>재채점</th><th>가장 오래된 제출</th><th>메일</th></tr></thead><tbody>' +
+      PENDING.map(r => `<tr>
+        <td>${esc(r.prof)}</td>
+        <td style="text-align:center;font-weight:700;">${esc(r.count)}</td>
+        <td style="text-align:center;${r.regrade ? 'color:#c0392b;font-weight:600;' : 'color:#aaa;'}">${r.regrade || '-'}</td>
+        <td style="font-size:12px;">${esc(String(r.oldest).slice(5, 16))}</td>
+        <td style="font-size:12px;${r.mailable ? 'color:#1a7a45;' : 'color:#c0392b;'}">${r.mailable ? '보낼 수 있음' : '주소 없음'}</td>
+      </tr>`).join('') + '</tbody></table></div>';
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    el.textContent = '불러오지 못했습니다: ' + e.message;
+  }
+}
+
+async function sendReminders() {
+  const btn = document.getElementById('remind-btn');
+  await loadPending();
+  if (!PENDING.length) { alert('채점이 남은 교수님이 없습니다.'); return; }
+  const able = PENDING.filter(r => r.mailable);
+  if (!able.length) { alert('보낼 수 있는 교수님이 없습니다. 교수 명단에 메일 주소를 넣어 주세요.'); return; }
+  if (!confirm('독려 메일을 보냅니다.\n\n' +
+               able.map(r => '· ' + r.prof + ' — ' + r.count + '건').join('\n') +
+               '\n\n보내시겠습니까?')) return;
+  btn.disabled = true; btn.textContent = '보내는 중...';
+  try {
+    const r = await api({ action: 'sendReminders' });
+    showToast('✅ ' + r.sent + '명에게 보냈습니다' + (r.skipped ? ' · ' + r.skipped + '명 건너뜀' : ''), '#1a7a45');
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    alert('보내지 못했습니다.\n' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✉️ 지금 독려 메일 보내기';
+  }
+}
+
+// =====================================================================
+// 마감 예외 목록
+// =====================================================================
+async function loadLateExceptions() {
+  const el = document.getElementById('late-exc');
+  if (!el || !currentProf || !currentProf.admin) return;
+  el.textContent = '불러오는 중...';
+  try {
+    const list = await api({ action: 'getLateExceptions' });
+    if (!list.length) { el.textContent = '걸려 있는 마감 예외가 없습니다.'; return; }
+    el.innerHTML = '<div style="overflow-x:auto;"><table class="grade-table"><thead><tr>' +
+      '<th>허용</th><th>학생</th><th>주차</th><th>사유</th><th>허용자</th></tr></thead><tbody>' +
+      list.map(r => `<tr>
+        <td style="font-size:11px;white-space:nowrap;">${esc(String(r.at).slice(5, 16))}</td>
+        <td>${esc(r.name || r.pseudo)}${r.studentId ? `<div style="font-size:11px;color:#999;">${esc(r.studentId)}</div>` : ''}</td>
+        <td style="text-align:center;">${esc(r.week)}</td>
+        <td style="font-size:12px;max-width:280px;">${esc(r.reason)}</td>
+        <td style="font-size:12px;">${esc(r.by)}</td>
+      </tr>`).join('') + '</tbody></table></div>';
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    el.textContent = '불러오지 못했습니다: ' + e.message;
+  }
+}
+
+// =====================================================================
+// 시스템 초기화
+// =====================================================================
+async function runAdminReset() {
+  const el = document.getElementById('reset-result');
+  const btn = document.getElementById('reset-btn');
+  const reason = document.getElementById('reset-reason').value.trim();
+  const confirmText = document.getElementById('reset-confirm').value.trim();
+  if (reason.length < 2) { alert('초기화 사유를 적어 주세요.'); return; }
+  if (confirmText !== '초기화') { alert('확인란에 초기화 라고 정확히 입력해 주세요.'); return; }
+  if (!confirm('제출물과 채점 기록을 모두 비웁니다.\n\n' +
+               '학생 명단·배정·교수 명단은 그대로 남습니다.\n' +
+               '지우기 전에 백업을 뜨고 메일로 보냅니다.\n\n정말 진행하시겠습니까?')) return;
+
+  btn.disabled = true; btn.textContent = '초기화 중...';
+  el.innerHTML = '<span style="color:#666;">백업을 뜨고 비우는 중입니다. 1~2분 걸릴 수 있습니다...</span>';
+  try {
+    const r = await api({ action: 'adminReset', reason: reason, confirm: confirmText });
+    document.getElementById('reset-confirm').value = '';
+    document.getElementById('reset-reason').value = '';
+    el.innerHTML = `<div class="info-box" style="background:#eefaf2;border-left:3px solid #1a7a45;line-height:1.7;">
+      <b>초기화를 마쳤습니다.</b><br>
+      남은 것 — 학생 ${esc(r.students)}명 · 배정 ${esc(r.plans)}건 · 교수 ${esc(r.profs)}명<br>
+      이전 자료는 Drive에서 <b>(이전 ${esc(r.stamp)})</b> 이름으로 찾을 수 있습니다.<br>
+      ${r.backupUrl ? `<a href="${escAttr(r.backupUrl)}" target="_blank">백업 사본 열기</a><br>` : ''}
+      이 화면은 <b>Ctrl+Shift+R</b> 로 새로 고쳐 주세요.</div>`;
+    SUBS = {};
+    renderSidebar();
+  } catch(e) {
+    el.innerHTML = `<div class="warn-box">${esc(e.message)}</div>`;
+    if (handleAuthError(e)) return;
+  } finally {
+    btn.disabled = false; btn.textContent = '초기화 실행';
+  }
 }
 
 // 성적 취합틀 엑셀을 받아 채점 결과를 채워 되돌려준다.
@@ -2029,64 +2790,125 @@ function calcScores() {
 }
 // 사진 관리
 // =====================================================================
-let uploadTargetSid = null;
+// 사진은 Drive 비공개 폴더에 있고, 담당 교수에게만 한 장씩 내려온다.
+// 받은 사진은 이 화면이 열려 있는 동안 메모리에만 둔다 — 기기에 저장하지 않는다.
+let PHOTOS = {};          // 가명코드 → dataUrl ('' 면 '없음'을 확인한 것)
+let uploadTargetPseudo = null;
 
-function triggerPhotoUpload(sid) {
-  uploadTargetSid = sid;
+function photoOf(s) {
+  return s && s.pseudo ? (PHOTOS[s.pseudo] || '') : '';
+}
+
+// 아직 확인하지 않은 학생의 사진을 한 장 받아 온다
+async function ensurePhoto(pseudo, after) {
+  if (!pseudo || PHOTOS[pseudo] !== undefined) return;
+  PHOTOS[pseudo] = '';            // 중복 요청을 막는다
+  try {
+    const r = await api({ action: 'getPhoto', pseudo: pseudo });
+    PHOTOS[pseudo] = r.found ? r.dataUrl : '';
+    if (r.found && after) after();
+  } catch(e) { /* 사진은 없어도 채점에 지장이 없다 */ }
+}
+
+function triggerPhotoUpload(pseudo) {
+  uploadTargetPseudo = pseudo;
   document.getElementById('single-photo').click();
 }
 
-function uploadSinglePhoto(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    lsSet('photo_' + uploadTargetSid, ev.target.result);
-    renderPhotoGrid();
-    if (currentTarget && SUBS[currentTarget.id] && SUBS[currentTarget.id].studentId === uploadTargetSid) { keepComment(); renderGradingContent(); }
-    renderSidebar();
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
+// 올리기 전에 브라우저에서 작게 줄인다
+function shrinkImage(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('사진을 읽지 못했습니다.'));
+    r.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('사진 형식을 읽지 못했습니다. JPG 또는 PNG로 올려 주세요.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
 }
 
-function bulkUploadPhotos(e) {
-  const files = Array.from(e.target.files);
-  let done = 0;
-  files.forEach(file => {
-    // 파일명에서 학번 추출 (예: 123456.jpg → 123456)
-    const sid = file.name.replace(/\.[^.]+$/, '').trim();
-    if (!Object.values(SUBS).some(x => x.studentId === sid)) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      lsSet('photo_' + sid, ev.target.result);
-      done++;
-      if (done === files.length) {
-        renderPhotoGrid(); renderSidebar();
-        alert('📷 ' + done + '명 사진 업로드 완료');
-      }
-    };
-    reader.readAsDataURL(file);
-  });
+async function uploadSinglePhoto(e) {
+  const file = e.target.files[0];
   e.target.value = '';
+  if (!file || !uploadTargetPseudo) return;
+  if (!/^image\//.test(file.type)) { alert('사진 파일만 올릴 수 있습니다 (JPG·PNG).'); return; }
+  const pseudo = uploadTargetPseudo;
+  try {
+    const b64 = await shrinkImage(file, 480);
+    await api({ action: 'uploadPhotoFor', pseudo: pseudo, fileData: b64 });
+    PHOTOS[pseudo] = 'data:image/jpeg;base64,' + b64;
+    showToast('✅ 사진을 등록했습니다', '#1a7a45');
+    renderPhotoGrid(); renderSidebar();
+    if (currentTarget && SUBS[currentTarget.id] && SUBS[currentTarget.id].pseudo === pseudo) {
+      keepComment(); renderGradingContent();
+    }
+  } catch(err) {
+    if (handleAuthError(err)) return;
+    alert('올리지 못했습니다.\n' + err.message);
+  }
+}
+
+async function bulkUploadPhotos(e) {
+  const files = Array.from(e.target.files);
+  e.target.value = '';
+  if (!files.length) return;
+  // 파일 이름에서 학번을 읽는다 (예: 2021-12345.jpg)
+  const byId = {};
+  Object.values(SUBS).forEach(x => { if (x.studentId) byId[x.studentId] = x.pseudo; });
+  let done = 0, skip = [];
+  for (const file of files) {
+    const sid = file.name.replace(/\.[^.]+$/, '').trim();
+    const pseudo = byId[sid];
+    if (!pseudo) { skip.push(file.name); continue; }
+    try {
+      const b64 = await shrinkImage(file, 480);
+      await api({ action: 'uploadPhotoFor', pseudo: pseudo, fileData: b64 });
+      PHOTOS[pseudo] = 'data:image/jpeg;base64,' + b64;
+      done++;
+    } catch(err) { skip.push(file.name + ' (' + err.message + ')'); }
+  }
+  renderPhotoGrid(); renderSidebar();
+  alert('📷 ' + done + '명 등록 완료' +
+        (skip.length ? '\n\n건너뜀 ' + skip.length + '건:\n' + skip.slice(0, 10).join('\n') +
+                       '\n\n파일 이름을 학번으로 해 주세요 (예: 2021-12345.jpg)' : ''));
 }
 
 function renderPhotoGrid() {
   const el = document.getElementById('photo-grid');
   const uniq = {};
-  Object.values(SUBS).forEach(x => { uniq[x.studentId] = x.name; });
-  const people = Object.keys(uniq).map(id => ({ id, name: uniq[id] }))
+  Object.values(SUBS).forEach(x => { if (x.pseudo) uniq[x.pseudo] = { name: x.name, id: x.studentId }; });
+  const people = Object.keys(uniq).map(p => ({ pseudo: p, id: uniq[p].id, name: uniq[p].name }))
     .sort((a,b) => String(a.name).localeCompare(String(b.name), 'ko'));
   if (!people.length) { el.innerHTML = '<div style="color:#aaa;font-size:13px;padding:14px;">제출한 학생이 표시됩니다.</div>'; return; }
+  // 이름·학번은 배정표에서 온 값이므로 반드시 escape 한다.
+  // 사진 탭은 일반 교수도 보기 때문에, 여기가 뚫리면 교수 세션이 통째로 샌다.
   el.innerHTML = people.map(s => {
-    const photo = lsGet('photo_' + s.id);
+    const photo = PHOTOS[s.pseudo] || '';
     return `<div class="photo-mgmt-item">
-      <div class="photo-mgmt-img" onclick="triggerPhotoUpload('${s.id}')" title="클릭하여 업로드">
-        ${photo ? `<img src="${photo}" alt="${s.name}" />` : '<div style="font-size:11px;color:#aaa;">클릭<br>업로드</div>'}
+      <div class="photo-mgmt-img" data-pseudo="${esc(s.pseudo)}" title="클릭하여 업로드">
+        ${photo ? `<img src="${esc(photo)}" alt="" />` : '<div style="font-size:11px;color:#aaa;">클릭<br>업로드</div>'}
       </div>
-      <div class="photo-mgmt-name">${s.name}</div>
-      <div class="photo-mgmt-id">${s.id}</div>
+      <div class="photo-mgmt-name">${esc(s.name)}</div>
+      <div class="photo-mgmt-id">${esc(s.id)}</div>
     </div>`;
   }).join('');
+  // 인라인 onclick 대신 이벤트로 붙인다 (속성 안에서는 escape 가 안전하지 않다)
+  el.querySelectorAll('.photo-mgmt-img').forEach(d =>
+    d.addEventListener('click', () => triggerPhotoUpload(d.dataset.pseudo)));
+  // 아직 확인 안 한 학생들의 사진을 받아 온다 (한 번만)
+  people.filter(s => PHOTOS[s.pseudo] === undefined)
+        .forEach(s => ensurePhoto(s.pseudo, () => renderPhotoGrid()));
 }
 
 
@@ -2372,9 +3194,9 @@ function clearDeadlines() {
 // 실습 첫 주는 강의만 하고 제출이 없다. 이 시스템은 2주차부터 쓰므로
 // 첫 마감(2주차)은 입력한 날짜가 속한 주가 아니라 '그 다음 주' 토요일이다.
 //   입력 2026-08-10(월)  →  2주차 마감 2026-08-22(토), 3주차 08-29 …
-const FIRST_DEADLINE_OFFSET = 12;   // 월요일 + 7일(첫 주 건너뛰기) + 5일(토요일)
+const FIRST_DEADLINE_OFFSET = 11;   // 월요일 + 7일(첫 주 건너뛰기) + 4일(금요일)
 
-function fillSaturdays() {
+function fillFridays() {
   const base = document.getElementById('deadline-base').value;
   if (!base) { alert('첫 주차의 실습 시작일(월요일)을 먼저 골라 주세요.'); return; }
   const start = new Date(base + 'T00:00:00');
@@ -2389,11 +3211,11 @@ function fillSaturdays() {
     const dt = new Date(start.getTime());
     dt.setDate(dt.getDate() + offsetWeeks * 7 + FIRST_DEADLINE_OFFSET);
     const p = n => String(n).padStart(2, '0');
-    d.at = `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} 00:00`;
+    d.at = `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())} 23:59`;
   });
   renderDeadlines();
   const first = DEADLINES[0];
-  showToast(firstWeek + '주차 마감을 ' + first.at.slice(0, 10) + '(토)로 채웠습니다. 확인 후 저장해 주세요.', '#1860a8');
+  showToast(firstWeek + '주차 마감을 ' + first.at.slice(0, 10) + '(금) 23:59로 채웠습니다. 확인 후 저장해 주세요.', '#1860a8');
 }
 
 const WDAY = ['일','월','화','수','목','금','토'];
@@ -2414,7 +3236,7 @@ function previewFirstDeadline() {
   dt.setDate(dt.getDate() + FIRST_DEADLINE_OFFSET);
   const firstWeek = DEADLINES && DEADLINES.length ? DEADLINES[0].week : '2';
   el.innerHTML = '실습 첫 주(' + fmtDate(start) + ' 주)는 제출이 없으므로 건너뜁니다. → <b>' +
-                 esc(firstWeek) + '주차 마감 ' + fmtDate(dt) + ' 00:00</b> 부터 채워집니다.';
+                 esc(firstWeek) + '주차 마감 ' + fmtDate(dt) + ' 23:59</b> 부터 채워집니다.';
 }
 
 async function saveDeadlines() {
@@ -2432,19 +3254,48 @@ async function saveDeadlines() {
   }
 }
 
-// 관리자가 수정 제출 기회를 한 번 더 준다
-async function allowResubmit() {
+// 관리자 예외 승인 — 제출 기회를 더 주거나, 횟수를 1차로 되돌린다
+async function allowResubmit(all) {
   const s = currentTarget && SUBS[currentTarget.id];
   if (!s) return;
-  if (!confirm(`${s.name} 학생에게 이 항목의 수정 제출 기회를 한 번 더 줍니다.\n\n현재 ${s.round || 1}차 제출 상태입니다. 계속할까요?`)) return;
+  const reason = askReason(all
+    ? `${s.name} 학생의 이 항목 제출 횟수를 1차로 되돌립니다.\n(잘못된 파일을 두 번 올린 경우)\n\n사유를 적어 주세요.`
+    : `${s.name} 학생에게 수정 제출 기회를 한 번 더 줍니다.\n현재 ${s.round || 1}차입니다.\n\n사유를 적어 주세요.`);
+  if (reason === null) return;
   try {
-    const r = await api({ action: 'allowResubmit', submissionId: s.submissionId });
+    const r = await api({ action: 'allowResubmit', submissionId: s.submissionId,
+                          all: !!all, reason: reason });
     s.round = r.round;
-    showToast('✅ 수정 제출을 한 번 더 할 수 있습니다', '#1a7a45');
+    showToast('✅ ' + r.message, '#1a7a45');
     keepComment(); renderGradingContent(); renderSidebar();
   } catch(e) {
     if (handleAuthError(e)) return;
     showToast('⚠️ ' + e.message, '#c0392b');
+  }
+}
+
+// 마감 예외 — 이 학생의 이 주차만 지각 표시에서 빼 준다
+async function toggleLateException() {
+  const s = currentTarget && SUBS[currentTarget.id];
+  if (!s) return;
+  const on = confirm(`${s.name} 학생 ${s.week}주차에 마감 예외를 ${'주'}시겠습니까?\n\n` +
+    '확인 = 예외를 걸어 지각 표시를 없앱니다.\n' +
+    '취소 = 이미 걸려 있는 예외를 푸는 화면으로 넘어갑니다.');
+  const reason = askReason(on
+    ? `${s.name} ${s.week}주차 마감 예외 사유를 적어 주세요.\n(예: 진단서 제출, 학사 사유 인정)`
+    : `${s.name} ${s.week}주차 마감 예외를 푸는 사유를 적어 주세요.`);
+  if (reason === null) return;
+  try {
+    const r = await api({ action: 'setLateException', studentId: s.studentId,
+                          week: s.week, reason: reason, remove: !on });
+    showToast('✅ ' + r.message, '#1a7a45');
+    alert(r.message + '\n\n이미 들어온 제출물의 지각 표시는 그대로 남습니다.\n' +
+          '예외를 걸면 그 뒤 들어오는 제출이 지각으로 표시되지 않습니다.\n' +
+          '이미 지각으로 들어온 건은 점수 입력 때 참고하시거나, 학생에게 다시 제출하게 해 주세요.');
+    loadSubmissions();
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    alert(e.message);
   }
 }
 
@@ -2567,11 +3418,63 @@ function downloadStudentStatusCSV() {
     '학생현황_' + new Date().toISOString().slice(0, 10) + '.csv');
 }
 
-function clearLocalPhotos() {
-  if (!confirm('이 기기에 저장된 학생 사진을 모두 삭제합니다. 채점 데이터는 서버에 있어 영향이 없습니다. 계속할까요?')) return;
-  Object.keys(localStorage).forEach(k => { if (k.startsWith('photo_')) localStorage.removeItem(k); });
-  renderPhotoGrid(); renderSidebar();
-  if (currentTarget) { keepComment(); renderGradingContent(); }
+// 예전 버전이 이 기기에 남겨 둔 사진을 치운다 (지금은 서버에 둔다)
+function clearOldLocalPhotos() {
+  try {
+    Object.keys(localStorage).forEach(k => { if (k.indexOf('photo_') === 0) localStorage.removeItem(k); });
+  } catch(e) {}
+}
+
+async function loadPhotoStatus() {
+  const el = document.getElementById('photo-status');
+  if (!el || !currentProf || !currentProf.admin) return;
+  el.textContent = '불러오는 중...';
+  try {
+    const r = await api({ action: 'getPhotoStatus' });
+    if (!r.enabled) {
+      el.innerHTML = '<div class="warn-box">사진 기능이 꺼져 있습니다.</div>';
+      return;
+    }
+    const byTurn = {};
+    r.students.forEach(x => {
+      const t = x.turn || '(턴 없음)';
+      byTurn[t] = byTurn[t] || { n: 0, p: 0 };
+      byTurn[t].n++; if (x.hasPhoto) byTurn[t].p++;
+    });
+    el.innerHTML =
+      `<div>등록된 사진 <b>${esc(r.withPhoto)}</b>장 / 학생 ${esc(r.total)}명</div>` +
+      '<div style="margin-top:4px;color:#888;">' +
+      Object.keys(byTurn).sort().map(t =>
+        esc(t) + (t.indexOf('턴') >= 0 ? '' : '턴') + ' ' + byTurn[t].p + '/' + byTurn[t].n).join(' · ') +
+      '</div>';
+  } catch(e) {
+    if (handleAuthError(e)) return;
+    el.textContent = '불러오지 못했습니다: ' + e.message;
+  }
+}
+
+async function runDeleteAllPhotos() {
+  const el = document.getElementById('photo-del-result');
+  const btn = document.getElementById('photo-del-btn');
+  const reason = document.getElementById('photo-del-reason').value.trim();
+  const confirmText = document.getElementById('photo-del-confirm').value.trim();
+  if (reason.length < 2) { alert('삭제 사유를 적어 주세요.'); return; }
+  if (confirmText !== '사진삭제') { alert('확인란에 사진삭제 라고 정확히 입력해 주세요.'); return; }
+  if (!confirm('등록된 학생 사진을 모두 지웁니다.\n\n되돌릴 수 없습니다. 계속하시겠습니까?')) return;
+  btn.disabled = true; btn.textContent = '지우는 중...';
+  try {
+    const r = await api({ action: 'deleteAllPhotos', reason: reason, confirm: confirmText });
+    document.getElementById('photo-del-confirm').value = '';
+    document.getElementById('photo-del-reason').value = '';
+    PHOTOS = {};
+    el.innerHTML = `<div class="info-box" style="background:#eefaf2;border-left:3px solid #1a7a45;">${esc(r.message)}</div>`;
+    loadPhotoStatus(); renderPhotoGrid(); renderSidebar();
+  } catch(e) {
+    el.innerHTML = `<div class="warn-box">${esc(e.message)}</div>`;
+    if (handleAuthError(e)) return;
+  } finally {
+    btn.disabled = false; btn.textContent = '사진 일괄 삭제';
+  }
 }
 
 </script>
