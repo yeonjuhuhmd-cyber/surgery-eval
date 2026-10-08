@@ -137,11 +137,13 @@
     <!-- 3단계: 확인 메일 안내 -->
     <div id="login-step-pending" style="display:none;text-align:left;">
       <div class="success-box" style="margin-bottom:12px;line-height:1.7;">
-        📧 <b id="pending-email"></b> 으로<br>확인 메일을 보냈습니다.
+        📧 학사 명단에 등록된 주소<br><b id="pending-email"></b> 으로<br>확인 메일을 보냈습니다.
       </div>
       <div style="font-size:13px;color:#555;line-height:1.9;margin-bottom:12px;">
         메일에 적힌 <b>인증번호 6자리</b>를 입력해 주세요.<br>
-        <span style="color:#888;font-size:12px;">메일이 안 보이면 스팸함도 확인해 주세요.</span>
+        <span style="color:#888;font-size:12px;">
+          본인 확인을 위해 <b>지금 로그인한 Google 계정이 아니라</b> 학교에 등록된 주소로 보냅니다.<br>
+          메일이 안 보이면 스팸함도 확인해 주세요.</span>
       </div>
       <input type="text" id="verify-code" inputmode="numeric" maxlength="6" placeholder="000000"
         style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:22px;text-align:center;letter-spacing:8px;font-weight:600;margin-bottom:10px;box-sizing:border-box;" />
@@ -153,6 +155,21 @@
       <button onclick="resendVerify()" id="resend-btn" style="width:100%;margin-top:6px;border:none;background:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;padding:6px;">
         확인 메일 다시 받기
       </button>
+      <button onclick="requestApproval()" id="approval-btn" style="width:100%;margin-top:2px;border:none;background:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;padding:6px;">
+        그 메일함을 쓸 수 없어요 — 조교 확인 요청
+      </button>
+    </div>
+
+    <!-- 4단계: 조교 확인을 기다리는 중 -->
+    <div id="login-step-approval" style="display:none;text-align:left;">
+      <div class="success-box" style="margin-bottom:12px;line-height:1.8;">
+        🕐 <b>조교 확인을 기다리고 있습니다.</b>
+      </div>
+      <div style="font-size:13px;color:#555;line-height:1.9;margin-bottom:14px;">
+        등록된 메일로 확인이 어려운 경우라 <b>담당 조교가 직접 확인</b>합니다.<br>
+        확인이 끝나면 아래 버튼을 눌러 들어오시면 됩니다.
+      </div>
+      <button class="btn btn-primary" onclick="retryLogin()">확인됐는지 다시 보기</button>
     </div>
 
     <div style="font-size:12px;color:#c0392b;min-height:18px;margin-top:12px;line-height:1.6;" id="login-err"></div>
@@ -175,15 +192,59 @@
 
   <div class="container" id="main-container">
     <div id="auth-error" class="error-box" style="display:none;"></div>
+    <div id="server-clock" style="font-size:12.5px;line-height:1.6;margin-bottom:12px;padding:9px 13px;
+         background:#f7f8f7;border:1px solid #e6e8e6;border-radius:9px;"></div>
 
     <div class="card" id="step-1">
       <div class="card-title"><div class="step-badge">1</div> 학생 정보 확인</div>
       <div id="student-verified" class="success-box"></div>
+      <div id="photo-card" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #eee;">
+        <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+          <div id="my-photo-box"
+               style="width:84px;height:100px;border-radius:8px;border:2px dashed #ddd;background:#fafafa;
+                      display:flex;align-items:center;justify-content:center;font-size:11px;color:#aaa;
+                      text-align:center;overflow:hidden;flex-shrink:0;">사진<br>없음</div>
+          <div style="flex:1;min-width:200px;font-size:12px;color:#888;line-height:1.7;">
+            <b style="color:#333;font-size:13px;">본인 사진 (선택)</b><br>
+            교수님이 수술장·외래에서 여러분을 알아보시는 데 쓰입니다. <b>담당 교수님과 실습 담당자만</b> 볼 수 있고,
+            Drive 비공개 폴더에 보관되며 <b>학기가 끝나면 일괄 삭제</b>합니다. 올리지 않아도 제출에는 아무 문제가 없습니다.
+            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+              <button onclick="document.getElementById('my-photo-input').click()" id="my-photo-btn"
+                      style="padding:7px 14px;background:#1860a8;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;">사진 올리기</button>
+              <button onclick="removeMyPhoto()" id="my-photo-del"
+                      style="display:none;padding:7px 14px;border:1px solid #ddd;background:#fff;border-radius:7px;cursor:pointer;font-size:12px;color:#c0392b;">사진 지우기</button>
+            </div>
+            <div id="my-photo-msg" style="margin-top:6px;"></div>
+          </div>
+        </div>
+        <input type="file" id="my-photo-input" accept="image/*" style="display:none;" onchange="handleMyPhoto(event)" />
+      </div>
     </div>
 
     <div class="card" id="step-2">
       <div class="card-title"><div class="step-badge">2</div> 실습 주차 선택</div>
       <div id="week-selector"></div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#888;line-height:1.7;">
+        배정이 실제와 다른가요? 아래에서 알려 주시면 담당자가 확인 후 바꿔 드립니다.
+        <b>직접 바꾸실 수는 없고</b>, 바뀌기 전까지는 지금 배정대로 제출해 주세요.
+        <div style="margin-top:8px;">
+          <button onclick="openPlanRequest()"
+                  style="padding:7px 14px;border:1px solid #ddd;background:#fff;border-radius:7px;cursor:pointer;font-size:12px;">배정 변경 요청하기</button>
+        </div>
+        <div id="plan-req-box" style="display:none;margin-top:10px;">
+          <select id="plan-req-week"
+                  style="padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;margin-bottom:6px;width:100%;max-width:280px;"></select>
+          <textarea id="plan-req-msg" rows="3" placeholder="예: 10주차가 Br/Endo 에서 응급의학으로 바뀌었습니다."
+                    style="width:100%;padding:9px 11px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+          <div style="margin-top:6px;display:flex;gap:6px;">
+            <button onclick="sendPlanRequest()" id="plan-req-btn"
+                    style="padding:8px 16px;background:#1860a8;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;">요청 보내기</button>
+            <button onclick="document.getElementById('plan-req-box').style.display='none'"
+                    style="padding:8px 14px;border:1px solid #ddd;background:#fff;border-radius:7px;cursor:pointer;font-size:12px;">취소</button>
+          </div>
+        </div>
+        <div id="plan-req-result" style="margin-top:8px;"></div>
+      </div>
     </div>
 
     <div class="card" id="step-3" style="display:none;">
@@ -208,7 +269,7 @@
         ondrop="handleDrop(event)">
         <div style="font-size:28px;margin-bottom:6px;">📎</div>
         <div style="font-size:13px;font-weight:500;">PDF 파일을 클릭하거나 드래그하여 첨부</div>
-        <div style="font-size:11px;color:#aaa;margin-top:4px;">PDF만 가능 · 최대 20MB</div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;" id="file-hint">PDF만 가능 · 최대 10MB</div>
       </div>
       <input type="file" id="file-input" accept="application/pdf,.pdf" style="display:none;" onchange="handleFileSelect(event)" />
       <div id="file-info" style="display:none;margin-top:10px;">
@@ -287,6 +348,15 @@ async function api(payload) {
   return data.data;
 }
 
+// onclick="fn('${...}')" 처럼 HTML 속성 안의 JS 문자열에 값을 넣을 때 쓴다.
+// esc() 만으로는 부족하다 — &#39; 는 HTML 파서가 ' 로 되돌린 뒤 JS 가 읽으므로
+// 따옴표를 빠져나갈 수 있다. 역슬래시를 먼저 붙인 뒤 HTML escape 를 한다.
+function escAttr(v) {
+  return esc(String(v ?? '').replace(/[\u0000-\u001f]/g, ' ')
+                            .replace(/\\/g, '\\\\')
+                            .replace(/'/g, "\\'"));
+}
+
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -296,7 +366,7 @@ function badgeOf(campus) {
 function setErr(msg) { document.getElementById('login-err').textContent = msg || ''; }
 
 function showLoginStep(step) {
-  ['google', 'register', 'pending'].forEach(s => {
+  ['google', 'register', 'pending', 'approval'].forEach(s => {
     document.getElementById('login-step-' + s).style.display = (s === step) ? 'block' : 'none';
   });
 }
@@ -321,8 +391,10 @@ async function routeLogin() {
       document.getElementById('reg-email').textContent = r.email;
       showLoginStep('register');
       setTimeout(() => document.getElementById('reg-hakbun').focus(), 100);
+    } else if (r.status === 'needApproval') {
+      showLoginStep('approval');
     } else if (r.status === 'pending') {
-      document.getElementById('pending-email').textContent = r.email;
+      // 어느 메일함인지는 등록 때 보여 줬다. 다시 들어온 경우에는 비워 둔다.
       showLoginStep('pending');
     } else {
       enterApp(r);
@@ -341,7 +413,8 @@ async function submitRegistration() {
   setErr('');
   try {
     const r = await api({ action: 'studentRegister', idToken, studentId: hakbun });
-    document.getElementById('pending-email').textContent = r.email;
+    if (r.status === 'needApproval') { showLoginStep('approval'); setErr(''); return; }
+    document.getElementById('pending-email').textContent = r.sentTo || '';
     showLoginStep('pending');
   } catch(e) {
     setErr(e.message);
@@ -366,12 +439,27 @@ async function submitCode() {
   }
 }
 
+async function requestApproval() {
+  if (!confirm('등록된 메일함을 쓸 수 없는 경우에만 눌러 주세요.\n\n' +
+               '담당 조교가 본인 확인 후 처리합니다. 바로 들어오실 수는 없습니다.\n\n계속할까요?')) return;
+  const btn = document.getElementById('approval-btn');
+  btn.disabled = true;
+  try {
+    await api({ action: 'studentRequestApproval', idToken });
+    showLoginStep('approval');
+    setErr('');
+  } catch(e) { setErr(e.message); }
+  finally { btn.disabled = false; }
+}
+
 async function retryLogin() {
   setErr('확인 중...');
   try {
     const r = await api({ action: 'studentLogin', idToken });
     if (r.status === 'ok') { setErr(''); enterApp(r); return; }
-    setErr('아직 확인되지 않았습니다. 메일의 인증번호 6자리를 입력해 주세요.');
+    setErr(r.status === 'needApproval'
+      ? '아직 조교 확인 전입니다. 조금 뒤에 다시 눌러 주세요.'
+      : '아직 확인되지 않았습니다. 메일의 인증번호 6자리를 입력해 주세요.');
   } catch(e) {
     setErr(e.message);
   }
@@ -382,9 +470,10 @@ async function resendVerify() {
   btn.disabled = true;
   setErr('');
   try {
-    await api({ action: 'studentResend', idToken });
+    const r = await api({ action: 'studentResend', idToken });
+    if (r.sentTo) document.getElementById('pending-email').textContent = r.sentTo;
     setErr('');
-    alert('확인 메일을 다시 보냈습니다.');
+    alert('확인 메일을 다시 보냈습니다.' + (r.sentTo ? '\n(' + r.sentTo + ')' : ''));
   } catch(e) { setErr(e.message); }
   finally { btn.disabled = false; }
 }
@@ -406,7 +495,9 @@ function enterApp(r) {
   const av = document.getElementById('user-avatar');
   if (googleUser && googleUser.picture) { av.src = googleUser.picture; av.style.display = ''; }
   else av.style.display = 'none';
+  noteServerTime(r.now);     // 서버 시각에 시계를 맞춘다
   initStudentView();
+  startClock();
 }
 
 function signOut() {
@@ -456,6 +547,10 @@ function initStudentView() {
   document.getElementById('student-verified').innerHTML =
     `✅ <b>${esc(me.name)}</b> (${esc(me.id)}) 님으로 로그인되었습니다.`;
 
+  const fh = document.getElementById('file-hint');
+  if (fh) fh.textContent = 'PDF만 가능 · 최대 ' + (info.maxFileMB || 10) + 'MB';
+  loadMyPhoto();
+
   const el = document.getElementById('week-selector');
   if (!info.schedule.length) {
     el.innerHTML = '<div class="error-box">배정된 실습 일정이 없습니다. 실습 담당자에게 문의해 주세요.</div>';
@@ -464,25 +559,202 @@ function initStudentView() {
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;">' +
     info.schedule.map(s => {
       const campus = s.dk.split('-')[0];
-      return `<button class="task-item" style="display:block;text-align:left;background:${s.closed ? '#f7f7f7' : '#fff'};${s.closed ? 'cursor:not-allowed;opacity:.65;' : ''}"
-        id="week-${esc(s.week)}" ${s.closed ? 'disabled' : ''} onclick="selectWeek('${esc(s.week)}','${esc(s.dk)}')">
-        <div style="font-weight:600;font-size:14px;margin-bottom:3px;">${esc(s.week)}주차${s.closed ? ' <span style="color:#c0392b;font-size:11px;">마감</span>' : ''}</div>
+      return `<button class="task-item" style="display:block;text-align:left;background:${s.closed ? '#fdf8f7' : '#fff'};"
+        id="week-${esc(s.week)}" onclick="selectWeek('${escAttr(s.week)}','${escAttr(s.dk)}')">
+        <div style="font-weight:600;font-size:14px;margin-bottom:3px;">${esc(s.week)}주차${
+          s.closed ? (s.excused
+            ? ' <span style="color:#1a7a45;font-size:11px;">마감 지남 · 예외 인정</span>'
+            : ' <span style="color:#a8442f;font-size:11px;">마감 지남 · 지각 처리</span>') : ''}</div>
         <div><span class="badge ${badgeOf(campus)}">${esc(s.dk)}</span></div>
         ${s.deadline ? `<div style="font-size:11px;color:${s.closed ? '#c0392b' : '#888'};margin-top:4px;">마감 ${esc(s.deadline)}</div>` : ''}
       </button>`;
     }).join('') + '</div>' +
-    (info.schedule.some(s => s.closed)
-      ? '<div style="font-size:12px;color:#888;margin-top:10px;line-height:1.7;">마감된 주차는 제출할 수 없습니다. 사정이 있으면 실습 담당 교수님께 문의해 주세요.</div>' : '');
+    (info.schedule.some(s => s.closed && !s.excused)
+      ? '<div style="font-size:12px;color:#a8442f;margin-top:10px;line-height:1.7;">마감이 지난 주차도 제출은 됩니다. 다만 <b>지각 제출</b>로 기록되며 성적에 반영될 수 있습니다.</div>' : '') +
+    (info.schedule.some(s => s.excused)
+      ? '<div style="font-size:12px;color:#1a7a45;margin-top:8px;line-height:1.7;">예외가 인정된 주차는 마감이 지나도 <b>지각으로 기록되지 않습니다.</b></div>' : '');
+}
+
+// 본인 사진 — 올리기 전에 브라우저에서 작게 줄여 보낸다 (용량·전송시간)
+function shrinkImage(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('사진을 읽지 못했습니다.'));
+    r.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('사진 형식을 읽지 못했습니다. JPG 또는 PNG로 올려 주세요.'));
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const url = c.toDataURL('image/jpeg', 0.82);
+        resolve(url.split(',')[1]);
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+
+async function loadMyPhoto() {
+  const card = document.getElementById('photo-card');
+  if (!card || info.photosEnabled === false) return;
+  card.style.display = 'block';
+  try {
+    const r = await api({ action: 'myPhoto' });
+    showMyPhoto(r.found ? r.dataUrl : '');
+  } catch(e) { /* 사진은 없어도 제출에 지장이 없다 */ }
+}
+
+function showMyPhoto(dataUrl) {
+  const box = document.getElementById('my-photo-box');
+  const del = document.getElementById('my-photo-del');
+  const btn = document.getElementById('my-photo-btn');
+  if (dataUrl) {
+    box.innerHTML = '<img src="' + dataUrl + '" alt="" style="width:100%;height:100%;object-fit:cover;" />';
+    box.style.border = '2px solid #e0e0e0';
+    del.style.display = 'inline-block';
+    btn.textContent = '사진 바꾸기';
+  } else {
+    box.innerHTML = '사진<br>없음';
+    box.style.border = '2px dashed #ddd';
+    del.style.display = 'none';
+    btn.textContent = '사진 올리기';
+  }
+}
+
+async function handleMyPhoto(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const msg = document.getElementById('my-photo-msg');
+  const btn = document.getElementById('my-photo-btn');
+  if (!/^image\//.test(file.type)) {
+    msg.innerHTML = '<div class="error-box">사진 파일만 올릴 수 있습니다 (JPG·PNG).</div>';
+    return;
+  }
+  btn.disabled = true; btn.textContent = '올리는 중...';
+  msg.innerHTML = '';
+  try {
+    const b64 = await shrinkImage(file, 480);
+    const r = await api({ action: 'uploadMyPhoto', fileData: b64 });
+    showMyPhoto('data:image/jpeg;base64,' + b64);
+    msg.innerHTML = `<div class="success-box">${esc(r.message)}</div>`;
+  } catch(err) {
+    msg.innerHTML = `<div class="error-box">${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function removeMyPhoto() {
+  if (!confirm('등록한 사진을 지울까요?')) return;
+  const msg = document.getElementById('my-photo-msg');
+  try {
+    const r = await api({ action: 'removeMyPhoto' });
+    showMyPhoto('');
+    msg.innerHTML = `<div class="success-box">${esc(r.message)}</div>`;
+  } catch(err) {
+    msg.innerHTML = `<div class="error-box">${esc(err.message)}</div>`;
+  }
+}
+
+// 배정 변경 요청 — 학생은 알려 주기만 하고, 바꾸는 것은 담당자가 한다
+function openPlanRequest() {
+  const box = document.getElementById('plan-req-box');
+  const sel = document.getElementById('plan-req-week');
+  const opts = [];
+  const mine = {};
+  (info.schedule || []).forEach(s => { mine[String(s.week)] = s.dk; });
+  for (let w = 1; w <= 12; w++) {
+    const dk = mine[String(w)];
+    opts.push(`<option value="${w}">${w}주차 — ${dk ? esc(dk) : '배정 없음'}</option>`);
+  }
+  sel.innerHTML = opts.join('');
+  const first = (info.schedule || [])[0];
+  if (first) sel.value = String(first.week);
+  box.style.display = 'block';
+  document.getElementById('plan-req-result').innerHTML = '';
+  document.getElementById('plan-req-msg').focus();
+}
+
+async function sendPlanRequest() {
+  const week = document.getElementById('plan-req-week').value;
+  const msg  = document.getElementById('plan-req-msg').value.trim();
+  const out  = document.getElementById('plan-req-result');
+  const btn  = document.getElementById('plan-req-btn');
+  if (msg.length < 5) { out.innerHTML = '<div class="error-box">어떻게 바뀌는지 조금 더 적어 주세요.</div>'; return; }
+  btn.disabled = true; btn.textContent = '보내는 중...';
+  try {
+    const r = await api({ action: 'requestPlanChange', week: week, message: msg });
+    document.getElementById('plan-req-box').style.display = 'none';
+    document.getElementById('plan-req-msg').value = '';
+    out.innerHTML = `<div class="success-box">${esc(r.message)}</div>`;
+  } catch(e) {
+    out.innerHTML = `<div class="error-box">${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '요청 보내기';
+  }
+}
+
+// 서버 기준 시계. "제 폰은 23:58이었는데요" 라는 분쟁을 없앤다.
+// 로그인할 때 받은 서버 시각과 그때의 기기 시각 차이를 기억해 두고 계속 보정한다.
+let SERVER_SKEW_MS = 0;
+
+function noteServerTime(nowStr) {
+  if (!nowStr) return;
+  const t = new Date(String(nowStr).replace(/-/g, '/')).getTime();
+  if (!isNaN(t)) SERVER_SKEW_MS = t - Date.now();
+}
+
+function serverNow() { return new Date(Date.now() + SERVER_SKEW_MS); }
+
+function fmtClock(d) {
+  const z = n => String(n).padStart(2, '0');
+  return z(d.getHours()) + ':' + z(d.getMinutes()) + ':' + z(d.getSeconds());
+}
+
+function renderClock() {
+  const el = document.getElementById('server-clock');
+  if (!el) return;
+  const now = serverNow();
+  const slot = state.week ? info.schedule.find(s => s.week === state.week && s.dk === state.dk) : null;
+  let right = '';
+  if (slot && slot.deadline) {
+    const end = new Date((slot.deadline + ':59').replace(/-/g, '/')).getTime();
+    const left = end - now.getTime();
+    if (left > 0) {
+      const h = Math.floor(left / 3600000), m = Math.floor(left % 3600000 / 60000), sec = Math.floor(left % 60000 / 1000);
+      const txt = h >= 24 ? Math.floor(h / 24) + '일 ' + (h % 24) + '시간'
+                : h > 0 ? h + '시간 ' + m + '분'
+                : m > 0 ? m + '분 ' + sec + '초' : sec + '초';
+      right = `<span style="color:${left < 3600000 ? '#a8442f' : '#1a7a45'};font-weight:600;">${state.week}주차 마감까지 ${txt}</span>`;
+    } else {
+      right = `<span style="color:#a8442f;font-weight:600;">⏰ ${state.week}주차 마감 지남 · 지각 처리</span>`;
+    }
+  }
+  el.innerHTML = `<span style="color:#888;">지금 <b style="color:#1a1a1a;font-variant-numeric:tabular-nums;">${fmtClock(now)}</b> (서버 기준)</span>`
+    + (right ? ' · ' + right : '');
+}
+
+function startClock() {
+  renderClock();
+  if (!window._clockT) window._clockT = setInterval(renderClock, 1000);
 }
 
 function selectWeek(week, dk) {
   const slot = info.schedule.find(s => s.week === week && s.dk === dk);
   if (slot && slot.closed) {
-    alert(week + '주차는 제출이 마감되었습니다.\n(마감: ' + slot.deadline + ')\n\n실습 담당 교수님께 문의해 주세요.');
-    return;
+    if (!confirm(week + '주차는 마감 시각이 지났습니다.\n(마감: ' + slot.deadline + ')\n\n' +
+                 '지금 제출하셔도 접수는 되지만 "지각 제출"로 기록되며,\n' +
+                 '지각 여부는 성적에 반영될 수 있습니다.\n\n계속하시겠습니까?')) return;
   }
   state.week = week; state.dk = dk;
   state.task = null; state.taskIdx = null; state.profs = [];
+  renderClock();
   document.querySelectorAll('[id^="week-"]').forEach(b => b.classList.remove('selected'));
   document.getElementById('week-' + week).classList.add('selected');
 
@@ -588,8 +860,16 @@ function processFile(file) {
     document.getElementById('file-input').value = '';
     return;
   }
-  const maxMB = info.maxFileMB || 20;
-  if (file.size > maxMB * 1024 * 1024) { alert('파일 크기는 ' + maxMB + 'MB 이하만 첨부할 수 있습니다.'); return; }
+  const maxMB = info.maxFileMB || 10;
+  if (file.size > maxMB * 1024 * 1024) {
+    alert('파일 크기는 ' + maxMB + 'MB 이하만 첨부할 수 있습니다.\n\n'
+        + '지금 파일은 ' + formatSz(file.size) + ' 입니다. 보통 사진이 많이 들어가 커집니다.\n'
+        + '· 한글/워드: 저장할 때 "PDF/A" 대신 일반 PDF로, 그림 품질을 \'보통\'으로\n'
+        + '· 파워포인트: 파일 → 내보내기 → PDF, \'최소 크기\' 선택\n'
+        + '· 스캔한 문서라면 300dpi 이하 흑백으로 다시 스캔하면 크게 줄어듭니다.');
+    document.getElementById('file-input').value = '';
+    return;
+  }
   selectedFile = file;
   document.getElementById('file-icon').textContent = getFileIcon();
   document.getElementById('file-name').textContent = file.name;
@@ -645,6 +925,13 @@ function updateSubmitSummary() {
 // =====================================================================
 // 제출
 // =====================================================================
+// 서버가 밀려서 난 오류인지 (= 다시 눌러 볼 가치가 있는지) 가린다
+function isBusyError(e) {
+  const m = String((e && e.message) || '');
+  return ['몰려', '잠시 후', '시간이 초과', '처리 중입니다', '일시적', 'Timeout', 'timed out',
+          'Service', 'Exceeded', 'try again'].some(w => m.indexOf(w) >= 0);
+}
+
 async function submitForm() {
   const task = info.tasks[state.taskIdx] || {};
   if (task.fileRequired && !selectedFile) {
@@ -671,7 +958,29 @@ async function submitForm() {
       payload.fileData = await readAsBase64(selectedFile);
       btn.innerHTML = '<span class="spinner"></span>제출 중...';
     }
-    const r = await api(payload);
+    // 시스템이 밀려 실패한 경우에만 자동으로 다시 시도한다.
+    // 파일 크기·형식처럼 본인이 고쳐야 하는 일은 바로 알려 드린다.
+    let r = null, lastErr = null;
+    for (let tryNo = 1; tryNo <= 3; tryNo++) {
+      try { r = await api(payload); break; }
+      catch(err) {
+        lastErr = err;
+        if (err.authError || !isBusyError(err) || tryNo === 3) throw err;
+        btn.innerHTML = '<span class="spinner"></span>제출이 몰려 대기 중... (' + tryNo + '/2)';
+        await new Promise(ok => setTimeout(ok, 2500 * tryNo));
+      }
+    }
+    if (!r) throw lastErr;
+
+    const lateNote = r.late
+      ? `<div style="color:#a8442f;margin-top:10px;font-size:12px;line-height:1.7;background:#fbeeea;
+           border:1px solid #e4c0b6;border-radius:8px;padding:10px;">
+          ⏰ <b>마감 이후 제출(지각)로 기록되었습니다.</b><br>
+          마감 ${esc(r.deadline)} · 접수 ${esc(r.acceptedAt)}<br>
+          제출은 정상 접수되었고 채점도 진행됩니다. 지각 여부는 성적에 반영될 수 있습니다.</div>`
+      : `<div style="color:#1a7a45;margin-top:10px;font-size:12px;">
+          🕐 접수 시각 <b>${esc(r.acceptedAt || '')}</b> (서버 기준)${
+          r.honored ? '<br>앞서 시스템이 밀려 실패했던 시각으로 인정되었습니다.' : ''}</div>`;
 
     const fileNote = (selectedFile && !r.fileSaved)
       ? `<div style="color:#c0392b;margin-top:10px;font-size:12px;line-height:1.7;">
@@ -694,14 +1003,15 @@ async function submitForm() {
          ? `<div style="color:#9a6300;margin-top:10px;font-size:12px;line-height:1.7;">
               ↻ ${r.round}차 제출입니다. 앞서 낸 내용은 이번 제출로 <b>대체</b>되었고,<br>교수님께는 이 최종본만 보입니다.</div>`
          : '<div style="color:#1a7a45;margin-top:10px;font-size:12px;">✅ 교수님께 채점 요청이 전달되었습니다.</div>'}
-       ${fileNote}${mailNote}`;
+       ${lateNote}${fileNote}${mailNote}`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
   } catch(e) {
     btn.disabled = false;
     btn.innerHTML = '제출하기';
     if (handleSessionError(e)) return;
-    alert('❌ 제출이 저장되지 않았습니다.\n' + e.message + '\n\n잠시 후 다시 시도해 주세요.');
+    alert('❌ 제출이 저장되지 않았습니다.\n\n' + e.message +
+          (isBusyError(e) ? '' : '\n\n내용을 고친 뒤 다시 제출해 주세요.'));
   }
 }
 
