@@ -822,7 +822,7 @@ const RUBRICS = {
 // 채점 결과는 이 기기에 저장되지 않고 서버(Google Sheets)에만 기록됩니다.
 // =====================================================================
 // 이 화면의 버전. 서버와 다르면 관리 화면 설정 탭이 알려 준다.
-const PAGE_VERSION = '2026-10-16';
+const PAGE_VERSION = '2026-10-19';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyxJmg3ms94zZfgu5QcTwdPrkdX32ma4j6HuKsIH_SqIqedPVUXmKKzqjDz9l-cVH3vBA/exec';
 
 let session       = null;
@@ -1075,25 +1075,80 @@ function openFromUrl() {
 // 턴을 바꾸면 서버에서 그 턴만 다시 받아온다.
 let TURNS = [], CUR_TURN = null;
 
+// 조 — 한 턴 안에서 외과를 먼저 도는 1조와, 응급+정형을 먼저 돌고 외과를 나중에
+// 도는 2조. '' 이면 그 턴 전체를 본다.
+// 선택 상자의 값은 "4" · "4:1" · "4:2" · "전체" 모양이다.
+let CUR_GROUP = '';
+
+const groupLabel = g => g === '1' ? '1조' : g === '2' ? '2조' : '';
+
+// 한 건이 지금 고른 턴·조에 드는가. 표를 그리는 곳마다 이걸 쓴다.
+// 제출물은 서버에서 이미 턴으로 걸러 오지만, 학생 현황처럼 명단 전체를
+// 받아 오는 곳도 있어 여기서 턴까지 함께 본다.
+function inView(x) {
+  if (!x) return false;
+  if (CUR_GROUP && String(x.group || '') !== CUR_GROUP) return false;
+  if (CUR_TURN && CUR_TURN !== '전체' && x.turn !== undefined &&
+      String(x.turn || '') !== String(CUR_TURN)) return false;
+  return true;
+}
+
 function renderTurnSelect() {
   const sel = document.getElementById('filter-turn');
   if (!sel) return;
-  if (TURNS.length <= 1) { sel.style.display = 'none'; return; }
+  if (!TURNS.length) { sel.style.display = 'none'; return; }
   sel.style.display = '';
-  sel.innerHTML = TURNS.map(t => `<option value="${esc(t)}"${String(t) === String(CUR_TURN) ? ' selected' : ''}>${esc(t)}턴</option>`).join('')
-    + `<option value="전체"${CUR_TURN === '전체' ? ' selected' : ''}>전체 턴</option>`;
+  const cur = (CUR_TURN === '전체' ? '전체' : String(CUR_TURN || '')) + (CUR_GROUP ? ':' + CUR_GROUP : '');
+  const opt = (v, label) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+  sel.innerHTML = TURNS.map(t =>
+      opt(String(t),        t + '턴 전체') +
+      opt(String(t) + ':1', t + '턴 1조') +
+      opt(String(t) + ':2', t + '턴 2조')
+    ).join('') + opt('전체', '전체 턴');
 }
 
-async function changeTurn(t) {
+async function changeTurn(v) {
   if (currentTarget && hasUnsavedChanges() &&
       !confirm('저장하지 않은 채점 내용이 있습니다. 턴을 바꿀까요?')) { renderTurnSelect(); return; }
-  CUR_TURN = t;
+  const parts = String(v == null ? '' : v).split(':');
+  const t = parts[0], g = parts[1] || '';
+  const turnChanged = String(t) !== String(CUR_TURN);
+  CUR_TURN = t; CUR_GROUP = g;
   currentTarget = null;
   document.body.classList.remove('detail-mode');
+
+  const what = (t === '전체' ? '전체 턴' : t + '턴' + (CUR_GROUP ? ' ' + groupLabel(CUR_GROUP) : ''));
+
+  // 같은 턴 안에서 조만 바꿨으면 이미 받아 둔 것을 걸러 보여 주면 된다.
+  // 서버에 다시 묻지 않으므로 즉시 바뀐다.
+  if (!turnChanged && loadedOnce) {
+    showToast(what, '#1860a8');
+    renderTurnSelect(); refreshDeptFilter(); renderSidebar(); rerenderActivePanel();
+    showPanel(document.getElementById('manage-panel').style.display === 'none' ? 'grading' : 'manage');
+    return;
+  }
+
   SUBS = {}; loadedOnce = false;
-  showToast(t === '전체' ? '전체 턴을 불러옵니다...' : t + '턴을 불러옵니다...', '#1860a8');
+  showToast(what + '을 불러옵니다...', '#1860a8');
   await loadSubmissions();
+
+  // 학생 현황은 받아 둔 제출물로 세어 둔 것이라, 턴이 바뀌면 숫자가 옛것이 된다.
+  // 비워 두면 그 탭을 열 때 다시 센다. 지금 열려 있으면 바로 다시 센다.
+  if (STUSTAT) {
+    STUSTAT = null;
+    const panel = document.querySelector('.panel.active');
+    if (panel && panel.id === 'tab-students') await loadStudentStatus();
+  }
   showPanel(document.getElementById('manage-panel').style.display === 'none' ? 'grading' : 'manage');
+}
+
+// 지금 열려 있는 탭만 다시 그린다
+function rerenderActivePanel() {
+  const panel = document.querySelector('.panel.active');
+  if (!panel) return;
+  if (panel.id === 'tab-grades')   renderGradeTable();
+  if (panel.id === 'tab-excel')    renderGradeLog();
+  if (panel.id === 'tab-students' && typeof STUSTAT !== 'undefined' && STUSTAT) renderStudentStatus();
 }
 
 // 자동 새로고침
@@ -1164,7 +1219,7 @@ async function manualRefresh() {
 function refreshDeptFilter() {
   const sel = document.getElementById('filter-dept');
   const cur = sel.value;
-  const depts = [...new Set(Object.values(SUBS).map(s => s.dk))].sort();
+  const depts = [...new Set(Object.values(SUBS).filter(inView).map(s => s.dk))].sort();
   sel.innerHTML = '<option value="">전체 분과</option>' +
     depts.map(d => `<option value="${esc(d)}"${d === cur ? ' selected' : ''}>${esc(d)}</option>`).join('');
 }
@@ -1174,6 +1229,7 @@ function getFilteredSubs() {
   const dept = document.getElementById('filter-dept').value;
   const status = document.getElementById('filter-status').value;
   return Object.values(SUBS).filter(s => {
+    if (!inView(s)) return false;
     if (week && s.week !== week) return false;
     if (dept && s.dk !== dept) return false;
     const done = doneForMe(s);
@@ -1617,6 +1673,7 @@ function renderGradeTable() {
   const tbody = document.getElementById('grade-tbody');
   const groups = {};
   Object.values(SUBS).forEach(s => {
+    if (!inView(s)) return;
     if (weekF && s.week !== weekF) return;
     const k = s.studentId + '|' + s.week;
     if (!groups[k]) groups[k] = { name: s.name, studentId: s.studentId, week: s.week, dk: s.dk, campus: s.campus, byTask: {} };
@@ -1659,7 +1716,7 @@ function renderGradeTable() {
 function renderGradeLog() {
   const tbody = document.getElementById('grade-log-tbody');
   if (!tbody) return;
-  const list = Object.values(SUBS).sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
+  const list = Object.values(SUBS).filter(inView).sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:16px;">제출 데이터가 없습니다.</td></tr>';
     return;
@@ -1951,7 +2008,8 @@ async function buildGradeMatrixCSV() {
   if (!confirm('학생 실명과 점수가 담긴 파일이 내려받아집니다.\n사용 후 삭제해 주세요.\n\n계속할까요?')) return;
   const m = await buildMatrixData();
   if (!m) return;
-  const tag = CUR_TURN && CUR_TURN !== '전체' ? CUR_TURN + '턴_' : '전체_';
+  const tag = (CUR_TURN && CUR_TURN !== '전체' ? CUR_TURN + '턴' : '전체')
+            + (CUR_GROUP ? groupLabel(CUR_GROUP) : '') + '_';
   downloadCSV([m.head, ...m.rows], '성적취합표_' + tag + new Date().toISOString().slice(0, 10) + '.csv');
   showToast(`✅ 학생 ${m.rows.length}명 · ${m.maxRounds}회차 취합표를 내려받았습니다`, '#1a7a45');
 }
@@ -2000,6 +2058,7 @@ async function buildMatrixData() {
   const onlyTurn = CUR_TURN && CUR_TURN !== '전체' ? String(CUR_TURN) : null;
   const rows = ROSTER.students
     .filter(stu => !onlyTurn || String(stu.turn || '') === onlyTurn)
+    .filter(stu => !CUR_GROUP || String(stu.group || '') === CUR_GROUP)
     .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
     .map(stu => {
       const line = [stu.id, stu.name];
@@ -2203,7 +2262,14 @@ function renderRosterPreview(rows, info) {
   }
 
   const byTurn = {};
-  rows.forEach(r => { const t = r.turn || '(턴 없음)'; byTurn[t] = (byTurn[t] || 0) + 1; });
+  rows.forEach(r => {
+    const t = r.turn || '(턴 없음)';
+    const b = byTurn[t] = byTurn[t] || { n: 0, g1: 0, g2: 0 };
+    b.n++;
+    // 앞주차(2~5주) 배정이 있으면 1조, 뒷주차에만 있으면 2조
+    const early = (r.weeks || []).some(w => Number(w.week) && Number(w.week) < 6);
+    if (early) b.g1++; else b.g2++;
+  });
   const ids = rows.map(r => r.id);
   const dup = [...new Set(ids.filter((v, i) => ids.indexOf(v) !== i))];
   const plans = rows.reduce((a, r) => a + r.weeks.length, 0);
@@ -2234,7 +2300,8 @@ function renderRosterPreview(rows, info) {
       </div>
 
       <div style="font-size:13px;line-height:1.9;">
-        <b>턴별</b> ${Object.keys(byTurn).sort().map(t => esc(t) + '턴 ' + byTurn[t] + '명').join(' · ')}
+        <b>턴별</b> ${Object.keys(byTurn).sort().map(t =>
+          esc(t) + '턴 ' + byTurn[t].n + '명 (1조 ' + byTurn[t].g1 + ' · 2조 ' + byTurn[t].g2 + ')').join(' · ')}
       </div>
 
       <div style="font-size:13px;line-height:1.9;">
@@ -2286,8 +2353,22 @@ async function confirmRosterSave() {
     ROSTER_PENDING = null;
     document.getElementById('roster-preview').innerHTML = '';
     ROSTER = null;   // 성적 취합표가 새 명단을 쓰도록
+    STUSTAT = null;  // 학생 현황도 새 명단으로 다시 센다
     showToast(`✅ 학생 ${r.students}명 · 배정 ${r.plans}건 반영했습니다`, '#1a7a45');
+
+    // 턴 목록은 로그인할 때 한 번 받아 둔 것이라, 명단을 새로 올리면 옛것이 된다.
+    // 처음 올릴 때는 아예 비어 있어 턴·조 선택 상자가 보이지 않는다.
+    const turns = Array.isArray(r.turns) ? r.turns.map(String) : [];
+    if (turns.length) {
+      TURNS = turns;
+      if (!CUR_TURN || CUR_TURN !== '전체' && turns.indexOf(String(CUR_TURN)) < 0) {
+        CUR_TURN = turns[turns.length - 1];   // 가장 나중 턴을 본다
+        CUR_GROUP = '';
+      }
+      renderTurnSelect();
+    }
     loadRosterInfo();
+    await loadSubmissions();
   } catch(e) {
     if (handleAuthError(e)) return;
     alert(e.message);
@@ -2304,7 +2385,8 @@ async function loadRosterInfo() {
       ? `<div style="display:flex;gap:14px;flex-wrap:wrap;">
            <span>학생 <b>${esc(r.students)}</b>명</span>
            <span>배정 <b>${esc(r.plans)}</b>건</span>
-           <span>${r.byTurn.map(t => esc(t.turn) + '턴 ' + esc(t.count) + '명').join(' · ')}</span>
+           <span>${r.byTurn.map(t => esc(t.turn) + '턴 ' + esc(t.count) + '명'
+             + (t.g1 || t.g2 ? ' (1조 ' + esc(t.g1) + ' · 2조 ' + esc(t.g2) + ')' : '')).join(' · ')}</span>
          </div>`
       : `<div class="warn-box">아직 배정표를 올리지 않아, 예전에 코드에 적어 둔 명단 <b>${esc(r.students)}명</b>으로 동작하고 있습니다.</div>`;
   } catch(e) {
@@ -3358,6 +3440,7 @@ async function loadStudentStatus() {
       const last  = subs.map(s => s.submittedAt).sort().pop() || '';
       return {
         name: stu.name, id: stu.id,
+        turn: stu.turn || '', group: stu.group || '',
         state: acc ? acc.state : '미등록',
         email: acc ? acc.email : '',
         registeredAt: acc ? (acc.confirmedAt || acc.requestedAt) : '',
@@ -3381,16 +3464,22 @@ function renderStudentStatus() {
   if (!STUSTAT) return;
   const filter = (document.getElementById('stu-filter') || {}).value || '';
 
-  let list = STUSTAT.slice();
+  let list = STUSTAT.filter(inView);
   if (filter === 'unregistered') list = list.filter(s => s.state !== '확인완료');
   if (filter === 'nosubmit')     list = list.filter(s => s.subCount === 0);
   if (filter === 'pending')      list = list.filter(s => s.pending > 0);
-  list.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  // 턴 → 조 → 이름 차례로 모은다. '전체 턴'으로 봐도 턴·조끼리 붙어 보인다.
+  list.sort((a, b) =>
+    String(a.turn || '').localeCompare(String(b.turn || ''), 'ko') ||
+    String(a.group || '').localeCompare(String(b.group || '')) ||
+    a.name.localeCompare(b.name, 'ko'));
 
-  const total = STUSTAT.length;
-  const done  = STUSTAT.filter(s => s.state === '확인완료').length;
-  const noSub = STUSTAT.filter(s => s.subCount === 0).length;
-  const pend  = STUSTAT.reduce((a, s) => a + s.pending, 0);
+  // 요약 숫자도 지금 보고 있는 범위(턴·조)만 센다. 표와 숫자가 어긋나면 안 된다.
+  const scope = STUSTAT.filter(inView);
+  const total = scope.length;
+  const done  = scope.filter(s => s.state === '확인완료').length;
+  const noSub = scope.filter(s => s.subCount === 0).length;
+  const pend  = scope.reduce((a, s) => a + s.pending, 0);
 
   el.innerHTML = `
     <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;">
@@ -3402,12 +3491,13 @@ function renderStudentStatus() {
     </div>
     <div style="overflow-x:auto;">
     <table class="grade-table stack-table"><thead><tr>
-      <th>이름</th><th>학번</th><th>계정 등록</th><th>Google 계정</th>
+      <th>이름</th><th>학번</th><th>턴·조</th><th>계정 등록</th><th>Google 계정</th>
       <th>제출</th><th>채점완료</th><th>미채점</th><th>최근 제출</th>
     </tr></thead><tbody>` +
     (list.length ? list.map(s => `<tr>
       <td data-label="이름" style="font-weight:500;">${esc(s.name)}</td>
       <td data-label="학번" style="font-family:monospace;font-size:11px;">${esc(s.id)}</td>
+      <td data-label="턴·조" style="font-size:11px;color:#666;white-space:nowrap;">${esc(s.turn ? s.turn + '턴' : '-')}${s.group ? ' ' + esc(groupLabel(s.group)) : ''}</td>
       <td data-label="계정 등록"><span class="badge ${s.state === '확인완료' ? 'badge-green' : s.state === '확인대기' ? 'badge-amber' : 'badge-gray'}"
            style="font-size:11px;">${esc(s.state)}</span></td>
       <td data-label="Google 계정" style="font-size:11px;color:#888;word-break:break-all;">${esc(s.email || '-')}</td>
@@ -3417,7 +3507,7 @@ function renderStudentStatus() {
       <td data-label="미채점" style="text-align:center;color:${s.pending ? '#9a6300' : '#ccc'};font-weight:${s.pending ? '700' : '400'};">${esc(s.pending)}</td>
       <td data-label="최근 제출" style="font-size:11px;color:#888;">${esc(s.lastAt || '-')}</td>
     </tr>`).join('')
-      : '<tr><td colspan="8" style="text-align:center;color:#aaa;padding:16px;">조건에 맞는 학생이 없습니다.</td></tr>') +
+      : '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:16px;">조건에 맞는 학생이 없습니다.</td></tr>') +
     '</tbody></table></div>';
 }
 
@@ -3440,11 +3530,16 @@ function downloadStudentStatusCSV() {
   if (!currentProf.admin) { alert('관리자만 내려받을 수 있습니다.'); return; }
   if (!STUSTAT) { alert('먼저 학생 현황을 불러와 주세요.'); return; }
   if (!confirm('학생 실명과 Google 계정이 담긴 파일이 내려받아집니다.\n사용 후 삭제해 주세요.\n\n계속할까요?')) return;
-  downloadCSV([['이름','학번','계정 등록','Google 계정','등록시각','배정 회차','제출 건수','채점완료','미채점','최근 제출'],
-    ...STUSTAT.slice().sort((a, b) => a.name.localeCompare(b.name, 'ko')).map(s =>
-      [s.name, s.id, s.state, s.email, s.registeredAt, s.rounds,
+  // 화면에 보이는 범위(턴·조)만 내려받는다. 화면과 파일이 달라지면 안 된다.
+  const scope = STUSTAT.filter(inView);
+  if (!scope.length) { alert('지금 고른 범위에 학생이 없습니다.'); return; }
+  const tag = (CUR_TURN && CUR_TURN !== '전체' ? CUR_TURN + '턴' : '전체')
+            + (CUR_GROUP ? groupLabel(CUR_GROUP) : '');
+  downloadCSV([['이름','학번','턴','조','계정 등록','Google 계정','등록시각','배정 회차','제출 건수','채점완료','미채점','최근 제출'],
+    ...scope.slice().sort((a, b) => a.name.localeCompare(b.name, 'ko')).map(s =>
+      [s.name, s.id, s.turn, groupLabel(s.group), s.state, s.email, s.registeredAt, s.rounds,
        s.subCount, s.gradedCount, s.pending, s.lastAt])],
-    '학생현황_' + new Date().toISOString().slice(0, 10) + '.csv');
+    '학생현황_' + tag + '_' + new Date().toISOString().slice(0, 10) + '.csv');
 }
 
 // 예전 버전이 이 기기에 남겨 둔 사진을 치운다 (지금은 서버에 둔다)
@@ -3464,17 +3559,27 @@ async function loadPhotoStatus() {
       el.innerHTML = '<div class="warn-box">사진 기능이 꺼져 있습니다.</div>';
       return;
     }
+    // 턴 아래에 조까지 나눠 센다. 사진을 안 낸 학생을 조별로 찾아 독려하기 위해서다.
     const byTurn = {};
     r.students.forEach(x => {
       const t = x.turn || '(턴 없음)';
-      byTurn[t] = byTurn[t] || { n: 0, p: 0 };
-      byTurn[t].n++; if (x.hasPhoto) byTurn[t].p++;
+      const b = byTurn[t] = byTurn[t] || { n: 0, p: 0, g: {} };
+      b.n++; if (x.hasPhoto) b.p++;
+      if (x.group) {
+        const gg = b.g[x.group] = b.g[x.group] || { n: 0, p: 0 };
+        gg.n++; if (x.hasPhoto) gg.p++;
+      }
     });
     el.innerHTML =
       `<div>등록된 사진 <b>${esc(r.withPhoto)}</b>장 / 학생 ${esc(r.total)}명</div>` +
       '<div style="margin-top:4px;color:#888;">' +
-      Object.keys(byTurn).sort().map(t =>
-        esc(t) + (t.indexOf('턴') >= 0 ? '' : '턴') + ' ' + byTurn[t].p + '/' + byTurn[t].n).join(' · ') +
+      Object.keys(byTurn).sort().map(t => {
+        const b = byTurn[t];
+        const gs = Object.keys(b.g).sort()
+          .map(k => groupLabel(k) + ' ' + b.g[k].p + '/' + b.g[k].n).join(', ');
+        return esc(t) + (t.indexOf('턴') >= 0 ? '' : '턴') + ' ' + b.p + '/' + b.n +
+               (gs ? ' (' + esc(gs) + ')' : '');
+      }).join(' · ') +
       '</div>';
   } catch(e) {
     if (handleAuthError(e)) return;
